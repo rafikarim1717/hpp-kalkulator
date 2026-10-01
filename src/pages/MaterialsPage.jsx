@@ -1,6 +1,6 @@
 // Master Material / Kertas
 import React from 'react';
-import { Empty, Field, Modal } from '../components/ui.jsx';
+import { Empty, Field, Modal, NumInput } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { PAPER_TYPES } from '../lib/constants.js';
 import { fmtRp } from '../lib/format.js';
@@ -96,16 +96,16 @@ const PageMaterials = ({ materials, setMaterials }) => {
         <div className="stack" style={{ gap: 12 }}>
           <Field label="Nama Material"><input type="text" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="cth: Art Paper 120gsm" /></Field>
           <div className="grid-2">
-            <Field label="Gramatur" suffix="gsm"><input type="number" value={draft.gram} onChange={(e) => setDraft({ ...draft, gram: +e.target.value })} /></Field>
+            <Field label="Gramatur" suffix="gsm"><NumInput value={draft.gram} onChange={(v) => setDraft({ ...draft, gram: v })} /></Field>
             <Field label="Jenis">
               <select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
                 {PAPER_TYPES.map((t) => <option key={t}>{t}</option>)}
               </select>
             </Field>
-            <Field label="Lebar Plano" suffix="cm"><input type="number" step="0.1" value={draft.lebar} onChange={(e) => setDraft({ ...draft, lebar: +e.target.value })} /></Field>
-            <Field label="Tinggi Plano" suffix="cm"><input type="number" step="0.1" value={draft.tinggi} onChange={(e) => setDraft({ ...draft, tinggi: +e.target.value })} /></Field>
-            <Field label="Harga per Kemasan" suffix="Rp"><input type="number" value={draft.price} onChange={(e) => setDraft({ ...draft, price: +e.target.value })} /></Field>
-            <Field label="Isi per Kemasan" suffix="lbr plano" hint={`= ${fmtRp(draft.price / (draft.isi || 1))} per lembar plano`}><input type="number" value={draft.isi} onChange={(e) => setDraft({ ...draft, isi: +e.target.value })} /></Field>
+            <Field label="Lebar Plano" suffix="cm"><NumInput step="0.1" value={draft.lebar} onChange={(v) => setDraft({ ...draft, lebar: v })} /></Field>
+            <Field label="Tinggi Plano" suffix="cm"><NumInput step="0.1" value={draft.tinggi} onChange={(v) => setDraft({ ...draft, tinggi: v })} /></Field>
+            <Field label="Harga per Kemasan" suffix="Rp"><NumInput value={draft.price} onChange={(v) => setDraft({ ...draft, price: v })} /></Field>
+            <Field label="Isi per Kemasan" suffix="lbr plano" hint={`= ${fmtRp(draft.price / (draft.isi || 1))} per lembar plano. Cek ke supplier, tidak semua kertas dijual per 500 lembar.`}><NumInput value={draft.isi} onChange={(v) => setDraft({ ...draft, isi: v })} /></Field>
           </div>
           <Field label="Supplier"><input type="text" value={draft.supplier} onChange={(e) => setDraft({ ...draft, supplier: e.target.value })} placeholder="Nama supplier (opsional)" /></Field>
           <Field label="Catatan"><textarea rows="2" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></Field>

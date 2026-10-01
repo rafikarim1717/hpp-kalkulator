@@ -1,11 +1,11 @@
 // Plano & Imposition page
 import React from 'react';
-import { Card, Field, Seg, StatCard } from '../components/ui.jsx';
+import { Card, Field, NumInput, Seg, StatCard } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { PLANO_CUTS, calcImposition, calcSheetSize, sheetFitsMachine } from '../lib/calc.js';
 import { ITEM_PRESETS, PLANO_PRESETS } from '../lib/constants.js';
 
-const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
+const PagePlano = ({ planoState, setPlanoState, tools, components = [], activeComponentId, onSendToHpp }) => {
   const s = planoState;
   const set = (patch) => setPlanoState({ ...s, ...patch });
 
@@ -19,7 +19,11 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
 
   const tool = tools.find((t) => String(t.id) === String(s.machineId));
   const fit = tool ? sheetFitsMachine(sheet.w, sheet.h, tool) : null;
+  // Kalau belum pilih mesin, cek ke semua mesin di master data
+  const fittingTools = tools.filter((t) => sheetFitsMachine(sheet.w, sheet.h, t).ok);
 
+  const [targetId, setTargetId] = React.useState(activeComponentId);
+  const target = components.find((c) => c.id === targetId) || components.find((c) => c.id === activeComponentId) || components[0];
   const svgRef = React.useRef(null);
   const [previewSize, setPreviewSize] = React.useState({ w: 600, h: 500 });
 
@@ -36,10 +40,11 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
     return () => ro.disconnect();
   }, [sheet.w, sheet.h]);
 
-  const { cols, rows, count, rotated, eff } = result;
+  const { cols, rows, count, rotated, eff, mixed, blocks } = result;
   const perPlano = count * sheet.cut;
-  const aiw = rotated ? s.itemH : s.itemW;
-  const aih = rotated ? s.itemW : s.itemH;
+  const arrangement = mixed
+    ? blocks.map((b) => `${b.cols}×${b.rows}${b.rotated ? ' tidur' : ' berdiri'}`).join(' + ')
+    : `${cols} × ${rows}${rotated ? ' · rotated' : ''}`;
   const cw = previewSize.w;
   const ch = previewSize.h;
   const pad = 28;
@@ -47,12 +52,13 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
   const sw = sheet.w * scale, sh = sheet.h * scale;
   const ox = (cw - sw) / 2, oy = (ch - sh) / 2;
   const items = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = ox + s.bleedX * scale + c * (aiw + s.gapX) * scale;
-      const y = oy + s.bleedY * scale + r * (aih + s.gapY) * scale;
-      const rw = aiw * scale, rh = aih * scale;
-      items.push({ x, y, rw, rh, n: r * cols + c + 1 });
+  for (const b of blocks) {
+    for (let r = 0; r < b.rows; r++) {
+      for (let c = 0; c < b.cols; c++) {
+        const x = ox + (s.bleedX + b.x + c * (b.iw + s.gapX)) * scale;
+        const y = oy + (s.bleedY + b.y + r * (b.ih + s.gapY)) * scale;
+        items.push({ x, y, rw: b.iw * scale, rh: b.ih * scale, n: items.length + 1, alt: mixed && b.rotated });
+      }
     }
   }
 
@@ -61,9 +67,9 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
 
   const send = () => onSendToHpp({
     pcsPerSheet: count, planoCut: sheet.cut,
-    planoW, planoH, sheetW: sheet.w, sheetH: sheet.h,
+    planoW, planoH,
     machineId: s.machineId || '',
-  });
+  }, target?.id);
 
   return (
     <div className="page-fade">
@@ -78,7 +84,7 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
             <div className="row-between" style={{ marginBottom: 14 }}>
               <div className="section-eyebrow">Lembar Cetak {sheet.w} × {sheet.h} cm</div>
               <div className="mono" style={{ fontSize: 11.5, color: 'var(--text-3)' }}>
-                {cols} × {rows} = {count} pcs / lembar {rotated ? '· rotated' : ''}
+                {arrangement} = {count} pcs / lembar{mixed ? ' · campuran' : ''}
               </div>
             </div>
             <div className="plano-preview" style={{ padding: 0, background: 'var(--surface-2)' }}>
@@ -91,7 +97,8 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
                 {items.map((it) => (
                   <g key={it.n}>
                     <rect x={it.x} y={it.y} width={it.rw} height={it.rh}
-                      fill="var(--accent-soft)" stroke="var(--accent)" strokeWidth="0.9" rx="1.5"/>
+                      fill={it.alt ? 'color-mix(in oklch, var(--good) 14%, var(--surface))' : 'var(--accent-soft)'}
+                      stroke={it.alt ? 'var(--good)' : 'var(--accent)'} strokeWidth="0.9" rx="1.5"/>
                     {it.rw > 28 && it.rh > 18 && (
                       <text x={it.x + it.rw / 2} y={it.y + it.rh / 2 + 4}
                         fontSize="10" textAnchor="middle"
@@ -129,6 +136,20 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
               </div>
             </div>
           )}
+          {!tool && tools.length > 0 && fittingTools.length === 0 && (
+            <div className="alert alert-warn">
+              <span>!</span>
+              <div>
+                Lembar cetak {sheet.w} × {sheet.h} cm tidak muat di mesin mana pun di Master Mesin.
+                Potong plano lebih kecil di <strong>Potong Plano Jadi</strong>.
+              </div>
+            </div>
+          )}
+          {!tool && fittingTools.length > 0 && (
+            <div className="hint-box">
+              Lembar {sheet.w} × {sheet.h} cm muat di: {fittingTools.map((t) => t.name).join(', ')}. Pilih mesin di <strong>Cek Muat di Mesin</strong> untuk dipakai di HPP.
+            </div>
+          )}
           {fit && fit.ok && (
             <div className="alert alert-info">
               <span>✓</span>
@@ -136,9 +157,24 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
             </div>
           )}
 
+          {mixed && (
+            <div className="hint-box">
+              Layout campuran: sebagian item berdiri (biru), sebagian tidur (hijau). Lebih hemat kertas, tapi pemotongannya lebih banyak langkah.
+              Kalau tidak mau campuran, pilih mode Portrait atau Landscape.
+            </div>
+          )}
+
+          {components.length > 1 && (
+            <Field label="Kirim ke Komponen">
+              <select value={target?.id || ''} onChange={(e) => setTargetId(e.target.value)}>
+                {components.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+          )}
+
           <button className="btn btn-primary" style={{ width: '100%', padding: '12px 20px' }}
             onClick={send} disabled={count === 0}>
-            Gunakan hasil ini di Hitung HPP <Icon.Arrow style={{ width: 14, height: 14 }} />
+            Gunakan hasil ini di Hitung HPP{components.length > 1 && target ? ` → ${target.name}` : ''} <Icon.Arrow style={{ width: 14, height: 14 }} />
           </button>
         </div>
 
@@ -157,10 +193,10 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
               </Field>
               <div className="grid-2" style={{ gap: 10 }}>
                 <Field label="Lebar" suffix="cm">
-                  <input type="number" value={s.planoW} onChange={(e) => set({ planoW: +e.target.value })} />
+                  <NumInput value={s.planoW} onChange={(v) => set({ planoW: v })} />
                 </Field>
                 <Field label="Tinggi" suffix="cm">
-                  <input type="number" value={s.planoH} onChange={(e) => set({ planoH: +e.target.value })} />
+                  <NumInput value={s.planoH} onChange={(v) => set({ planoH: v })} />
                 </Field>
               </div>
               <Field label="Potong Plano Jadi" hint={`Lembar cetak: ${sheet.w} × ${sheet.h} cm (${cutDef.cols} kolom × ${cutDef.rows} baris)`}>
@@ -176,10 +212,10 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
               </Field>
               <div className="grid-2" style={{ gap: 10 }}>
                 <Field label="Margin Kiri-Kanan" suffix="cm">
-                  <input type="number" step="0.1" value={s.bleedX} onChange={(e) => set({ bleedX: +e.target.value })} />
+                  <NumInput step="0.1" value={s.bleedX} onChange={(v) => set({ bleedX: v })} />
                 </Field>
                 <Field label="Gripper Atas-Bawah" suffix="cm">
-                  <input type="number" step="0.1" value={s.bleedY} onChange={(e) => set({ bleedY: +e.target.value })} />
+                  <NumInput step="0.1" value={s.bleedY} onChange={(v) => set({ bleedY: v })} />
                 </Field>
               </div>
               <div className="hint-box">Margin diterapkan di kedua sisi lembar cetak. Gripper = sisi yang dijepit mesin (biasanya 0.8–1.2 cm). Margin kiri-kanan = sisa potong (0.3–0.5 cm).</div>
@@ -200,25 +236,25 @@ const PagePlano = ({ planoState, setPlanoState, tools, onSendToHpp }) => {
               </Field>
               <div className="grid-2" style={{ gap: 10 }}>
                 <Field label="Lebar" suffix="cm">
-                  <input type="number" step="0.1" value={s.itemW} onChange={(e) => set({ itemW: +e.target.value })} />
+                  <NumInput step="0.1" value={s.itemW} onChange={(v) => set({ itemW: v })} />
                 </Field>
                 <Field label="Tinggi" suffix="cm">
-                  <input type="number" step="0.1" value={s.itemH} onChange={(e) => set({ itemH: +e.target.value })} />
+                  <NumInput step="0.1" value={s.itemH} onChange={(v) => set({ itemH: v })} />
                 </Field>
               </div>
               <div className="hint-box">Kalau desain pakai bleed, masukkan ukuran + bleed. Contoh A5 dengan bleed 3 mm: 15.4 × 21.6 cm.</div>
               <div className="grid-2" style={{ gap: 10 }}>
                 <Field label="Gap H" suffix="cm">
-                  <input type="number" step="0.1" value={s.gapX} onChange={(e) => set({ gapX: +e.target.value })} />
+                  <NumInput step="0.1" value={s.gapX} onChange={(v) => set({ gapX: v })} />
                 </Field>
                 <Field label="Gap V" suffix="cm">
-                  <input type="number" step="0.1" value={s.gapY} onChange={(e) => set({ gapY: +e.target.value })} />
+                  <NumInput step="0.1" value={s.gapY} onChange={(v) => set({ gapY: v })} />
                 </Field>
               </div>
               <Field label="Mode Layout">
                 <Seg value={s.mode} onChange={(v) => set({ mode: v })}
                   options={[
-                    { value: 'best', label: 'Best Fit' },
+                    { value: 'best', label: 'Best Fit (+campuran)' },
                     { value: 'portrait', label: 'Portrait' },
                     { value: 'landscape', label: 'Landscape' },
                   ]}

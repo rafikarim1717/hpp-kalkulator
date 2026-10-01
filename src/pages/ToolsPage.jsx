@@ -1,17 +1,17 @@
 // Master Tools / Mesin
 import React from 'react';
-import { Empty, Field, Modal } from '../components/ui.jsx';
+import { Empty, Field, Modal, NumInput } from '../components/ui.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { fmtRp } from '../lib/format.js';
 
-const blankTool = () => ({ name: '', brand: '', maxw: 52, maxh: 74, minw: 10, minh: 15, runrate: 85000, plate: 45000, minorder: 500, maxcolor: 4, notes: '' });
+const blankTool = () => ({ name: '', brand: '', maxw: 52, maxh: 74, minw: 10, minh: 15, runrate: 85000, plate: 45000, minorder: 500, maxcolor: 4, setup: 50, notes: '' });
 
 const PageTools = ({ tools, setTools }) => {
   const [editing, setEditing] = React.useState(null);
   const [draft, setDraft] = React.useState(blankTool());
 
   const open = (t) => {
-    if (t) { setEditing(t.id); setDraft({ ...t }); }
+    if (t) { setEditing(t.id); setDraft({ setup: 50, ...t }); }
     else { setEditing('new'); setDraft(blankTool()); }
   };
   const close = () => { setEditing(null); };
@@ -69,7 +69,7 @@ const PageTools = ({ tools, setTools }) => {
                   </button>
                 </div>
               </div>
-              <div className="grid-3" style={{ gap: 10 }}>
+              <div className="grid-4" style={{ gap: 10 }}>
                 <div className="machine-stat">
                   <div className="machine-stat-label">Harga Lari</div>
                   <div className="machine-stat-val">{fmtRp(t.runrate)}</div>
@@ -84,6 +84,11 @@ const PageTools = ({ tools, setTools }) => {
                   <div className="machine-stat-label">Min. Ongkos Cetak</div>
                   <div className="machine-stat-val">{t.minorder.toLocaleString('id-ID')}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }} className="mono">lembar</div>
+                </div>
+                <div className="machine-stat">
+                  <div className="machine-stat-label">Kertas Setting</div>
+                  <div className="machine-stat-val">{(t.setup ?? 0).toLocaleString('id-ID')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }} className="mono">lbr / pass</div>
                 </div>
               </div>
               {t.notes && (
@@ -104,13 +109,14 @@ const PageTools = ({ tools, setTools }) => {
           <div className="grid-2">
             <Field label="Nama Mesin"><input type="text" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="cth: Heidelberg SM52" /></Field>
             <Field label="Merk / Tipe"><input type="text" value={draft.brand} onChange={(e) => setDraft({ ...draft, brand: e.target.value })} /></Field>
-            <Field label="Max Lebar" suffix="cm"><input type="number" value={draft.maxw} onChange={(e) => setDraft({ ...draft, maxw: +e.target.value })} /></Field>
-            <Field label="Max Tinggi" suffix="cm"><input type="number" value={draft.maxh} onChange={(e) => setDraft({ ...draft, maxh: +e.target.value })} /></Field>
-            <Field label="Min Lebar" suffix="cm"><input type="number" value={draft.minw} onChange={(e) => setDraft({ ...draft, minw: +e.target.value })} /></Field>
-            <Field label="Min Tinggi" suffix="cm"><input type="number" value={draft.minh} onChange={(e) => setDraft({ ...draft, minh: +e.target.value })} /></Field>
-            <Field label="Harga Lari /1000 lbr /pass"><input type="number" value={draft.runrate} onChange={(e) => setDraft({ ...draft, runrate: +e.target.value })} /></Field>
-            <Field label="Plate / CTP /plat"><input type="number" value={draft.plate} onChange={(e) => setDraft({ ...draft, plate: +e.target.value })} /></Field>
-            <Field label="Min. Ongkos Cetak" suffix="lbr" hint="Order di bawah ini tetap ditagih sejumlah ini per pass"><input type="number" value={draft.minorder} onChange={(e) => setDraft({ ...draft, minorder: +e.target.value })} /></Field>
+            <Field label="Max Lebar" suffix="cm"><NumInput value={draft.maxw} onChange={(v) => setDraft({ ...draft, maxw: v })} /></Field>
+            <Field label="Max Tinggi" suffix="cm"><NumInput value={draft.maxh} onChange={(v) => setDraft({ ...draft, maxh: v })} /></Field>
+            <Field label="Min Lebar" suffix="cm"><NumInput value={draft.minw} onChange={(v) => setDraft({ ...draft, minw: v })} /></Field>
+            <Field label="Min Tinggi" suffix="cm"><NumInput value={draft.minh} onChange={(v) => setDraft({ ...draft, minh: v })} /></Field>
+            <Field label="Harga Lari /1000 lbr /pass"><NumInput value={draft.runrate} onChange={(v) => setDraft({ ...draft, runrate: v })} /></Field>
+            <Field label="Plate / CTP /plat"><NumInput value={draft.plate} onChange={(v) => setDraft({ ...draft, plate: v })} /></Field>
+            <Field label="Min. Ongkos Cetak" suffix="lbr" hint="Order di bawah ini tetap ditagih sejumlah ini per pass"><NumInput value={draft.minorder} onChange={(v) => setDraft({ ...draft, minorder: v })} /></Field>
+            <Field label="Kertas Setting" suffix="lbr / pass" hint="Lembar terbuang tiap kali operator menyetel warna. Tanyakan ke operator mesin."><NumInput value={draft.setup} onChange={(v) => setDraft({ ...draft, setup: v })} /></Field>
             <Field label="Unit Warna (sekali jalan)">
               <select value={draft.maxcolor} onChange={(e) => setDraft({ ...draft, maxcolor: +e.target.value })}>
                 {[1, 2, 4, 5, 6].map((n) => <option key={n} value={n}>{n} warna{n === 4 ? ' (CMYK)' : ''}</option>)}

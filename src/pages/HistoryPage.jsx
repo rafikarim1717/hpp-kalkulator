@@ -53,7 +53,12 @@ const PageHistory = ({ history, setHistory, onOpen }) => {
               {[...history].reverse().map((h) => (
                 <tr key={h.id}>
                   <td className="mono" style={{ fontSize: 12, color: 'var(--text-3)' }}>{fmtDate(h.date)}</td>
-                  <td style={{ fontWeight: 500 }}>{h.name || <em style={{ color: 'var(--text-3)' }}>(tanpa nama)</em>}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    {h.name || <em style={{ color: 'var(--text-3)' }}>(tanpa nama)</em>}
+                    {h.components && h.components.length > 1 && (
+                      <div style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 400 }}>{h.components.join(' + ')}</div>
+                    )}
+                  </td>
                   <td className="mono">{Number(h.qty).toLocaleString('id-ID')}</td>
                   <td className="mono" style={{ fontWeight: 500 }}>{fmtRp(h.sub)}</td>
                   <td className="mono">{fmtRp(h.perPcs)}</td>

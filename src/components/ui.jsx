@@ -14,6 +14,27 @@ export const Field = ({ label, hint, suffix, children, ...rest }) => (
   </div>
 );
 
+// Input angka yang boleh dikosongkan saat mengetik. Kosong dianggap 0 untuk hitungan,
+// tapi tampilannya tetap kosong (tidak berubah jadi "0" lalu "01000").
+export const NumInput = ({ value, onChange, ...rest }) => {
+  const [text, setText] = React.useState(value == null ? '' : String(value));
+  React.useEffect(() => {
+    const n = Number(text);
+    const pending = text === '' || text === '-' || Number.isNaN(n);
+    if (!pending && n !== value) setText(value == null ? '' : String(value));
+    if (pending && value !== 0 && value != null) setText(String(value));
+  }, [value]);
+  return (
+    <input type="number" {...rest} value={text}
+      onChange={(e) => {
+        const t = e.target.value;
+        setText(t);
+        const n = Number(t);
+        onChange(t === '' || Number.isNaN(n) ? 0 : n);
+      }} />
+  );
+};
+
 export const Card = ({ title, eyebrow, action, children, style }) => (
   <div className="card" style={style}>
     {(title || eyebrow || action) && (

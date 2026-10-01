@@ -25,28 +25,58 @@ export function calcSheetSize(planoW, planoH, cut) {
   return { w: round2(planoW / c.cols), h: round2(planoH / c.rows), cut: c.value };
 }
 
-// Imposition: berapa item muat di satu lembar, returns {cols, rows, count, rotated, eff}
+// Imposition: berapa item muat di satu lembar.
+// mode 'portrait' / 'landscape' = semua item satu arah.
+// mode 'best' = coba semua arah + layout campuran (blok item berdiri + sisa ruang diisi item tidur, atau sebaliknya).
+// Returns {count, cols, rows, rotated, mixed, blocks, eff, ew, eh}.
+// blocks = [{x, y, cols, rows, iw, ih, rotated}] dengan x/y relatif terhadap area cetak (setelah margin).
+const EPS = 1e-9;
 export function calcImposition(sheetW, sheetH, itemW, itemH, bleedX, bleedY, gapX, gapY, mode) {
   const ew = sheetW - bleedX * 2;
   const eh = sheetH - bleedY * 2;
-  const fit = (iw, ih) => {
-    if (ew <= 0 || eh <= 0 || iw <= 0 || ih <= 0) return { cols: 0, rows: 0, count: 0 };
-    const cols = Math.max(0, Math.floor((ew + gapX) / (iw + gapX)));
-    const rows = Math.max(0, Math.floor((eh + gapY) / (ih + gapY)));
-    return { cols, rows, count: cols * rows };
+  const fitN = (len, size, gap) => (len <= 0 || size <= 0 ? 0 : Math.max(0, Math.floor((len + gap) / (size + gap) + EPS)));
+  const block = (x, y, w, h, iw, ih, rotated) => {
+    const cols = fitN(w, iw, gapX), rows = fitN(h, ih, gapY);
+    return { x, y, cols, rows, iw, ih, rotated, count: cols * rows };
   };
-  const r1 = fit(itemW, itemH);
-  const r2 = fit(itemH, itemW);
-  let best, rotated = false;
-  if (mode === 'portrait') best = r1;
-  else if (mode === 'landscape') { best = r2; rotated = true; }
-  else {
-    if (r2.count > r1.count) { best = r2; rotated = true; }
-    else best = r1;
+  const layout = (blocks) => ({ blocks: blocks.filter((b) => b.count > 0), count: blocks.reduce((s, b) => s + b.count, 0) });
+
+  const P = [itemW, itemH, false]; // berdiri (sesuai input)
+  const L = [itemH, itemW, true];  // tidur (diputar 90°)
+  const candidates = [];
+  if (mode !== 'landscape') candidates.push(layout([block(0, 0, ew, eh, ...P)]));
+  if (mode !== 'portrait') candidates.push(layout([block(0, 0, ew, eh, ...L)]));
+
+  if (mode !== 'portrait' && mode !== 'landscape') {
+    for (const [A, B] of [[P, L], [L, P]]) {
+      const [aw, ah] = A;
+      // Belah vertikal: c kolom orientasi A di kiri, sisa lebar diisi orientasi B
+      const maxC = fitN(ew, aw, gapX);
+      for (let c = 1; c < maxC; c++) {
+        const used = c * (aw + gapX);
+        candidates.push(layout([block(0, 0, used - gapX, eh, ...A), block(used, 0, ew - used, eh, ...B)]));
+      }
+      // Belah horizontal: r baris orientasi A di atas, sisa tinggi diisi orientasi B
+      const maxR = fitN(eh, ah, gapY);
+      for (let r = 1; r < maxR; r++) {
+        const used = r * (ah + gapY);
+        candidates.push(layout([block(0, 0, ew, used - gapY, ...A), block(0, used, ew, eh - used, ...B)]));
+      }
+    }
   }
+
+  // Ambil yang paling banyak; kalau seri, pilih yang lebih sederhana (urutan kandidat: satu arah dulu)
+  let best = { blocks: [], count: 0 };
+  for (const c of candidates) if (c.count > best.count) best = c;
+
+  const main = best.blocks[0] || { cols: 0, rows: 0, rotated: false };
+  const mixed = best.blocks.length > 1;
   // Efisiensi dihitung terhadap luas lembar penuh (gripper & bleed termasuk waste)
   const eff = best.count > 0 ? (best.count * itemW * itemH) / (sheetW * sheetH) * 100 : 0;
-  return { ...best, rotated, eff, ew, eh };
+  return {
+    count: best.count, cols: main.cols, rows: main.rows, rotated: !mixed && main.rotated,
+    mixed, blocks: best.blocks, eff, ew, eh,
+  };
 }
 
 // Apakah lembar cetak muat di mesin (boleh diputar 90°)
@@ -107,14 +137,16 @@ export function calcHPP(input) {
   const billedPerPass = printSheets > 0 ? Math.max(printSheets, minRun) : 0;
   const runCost = passes * (billedPerPass / 1000) * runRate;
 
-  // 7. Finishing, qty otomatis mengikuti basis-nya
+  // 7. Finishing, qty otomatis mengikuti basis-nya. sides = 2 untuk finishing 2 sisi (mis. laminasi bolak-balik)
   const finItems = (finishings || []).map((f) => {
     const price = parseFloat(f.price) || 0;
-    let units, cost;
-    if (f.basis === 'flat') { units = 1; cost = price; }
-    else if (f.basis === 'per1000lembar') { units = netSheets; cost = price / 1000 * netSheets; }
-    else { units = qty; cost = price / 1000 * qty; } // per1000pcs (default)
-    return { ...f, units, cost };
+    const fSides = f.basis === 'flat' ? 1 : (Number(f.sides) === 2 ? 2 : 1);
+    let units;
+    if (f.basis === 'flat') units = 1;
+    else if (f.basis === 'per1000lembar') units = netSheets;
+    else units = qty; // per1000pcs (default)
+    const cost = f.basis === 'flat' ? price : price / 1000 * units * fSides;
+    return { ...f, units, sides: fSides, cost };
   });
   const finTotal = finItems.reduce((s, f) => s + f.cost, 0);
 
@@ -122,7 +154,17 @@ export function calcHPP(input) {
   const sub = plateCost + runCost + paperCost + finTotal + other;
   const perPcs = qty > 0 ? sub / qty : 0;
 
-  // 8. Harga jual. markup = % dari HPP, margin = % dari harga jual
+  return {
+    netSheets, wastePctSheets, setupWaste, printSheets, planoSheets,
+    passesFront, passesBack, passes, plates, billedPerPass,
+    plateCost, runCost, paperCost, finItems, finTotal, otherCost: other,
+    sub, perPcs,
+    ...applyPricing(sub, qty, { pricingMode, marginPct, ppnPct }),
+  };
+}
+
+// Harga jual. markup = % dari HPP, margin = % dari harga jual
+export function applyPricing(sub, qty, { pricingMode = 'markup', marginPct = 0, ppnPct = 0 } = {}) {
   const m = (marginPct || 0) / 100;
   let sell;
   if (pricingMode === 'margin') sell = m < 1 ? sub / (1 - m) : NaN;
@@ -134,13 +176,38 @@ export function calcHPP(input) {
   const ppn = sell * (ppnPct || 0) / 100;
   const sellIncl = sell + ppn;
   const sellInclPer = qty > 0 ? sellIncl / qty : 0;
+  return { sell, sellPer, profit, effMarginPct, effMarkupPct, ppn, sellIncl, sellInclPer };
+}
 
+// Qty cetak sebuah komponen = jumlah produk jadi × jumlah komponen per produk
+export const componentQty = (jobQty, comp) => (jobQty || 0) * (Number(comp.perProduct) > 0 ? Number(comp.perProduct) : 1);
+
+// Produk multi-komponen (mis. buku = isi + cover, kalender = lembar bulan + alas).
+// job = { qty, components: [componentInput], jobFinishings, otherCost, pricingMode, marginPct, ppnPct }
+// Tiap komponen dihitung dengan calcHPP (tanpa margin), lalu dijumlah + finishing produk jadi + biaya lain.
+export function calcJob(job) {
+  const qty = job.qty || 0;
+  const components = (job.components || []).map((c) => {
+    const cQty = componentQty(qty, c);
+    const result = calcHPP({ ...c, qty: cQty, otherCost: 0, marginPct: 0, ppnPct: 0 });
+    return { id: c.id, name: c.name, qty: cQty, result };
+  });
+  const productionSub = components.reduce((s, c) => s + c.result.sub, 0);
+
+  // Finishing produk jadi (jilid, ring, rakit): per 1000 produk atau flat
+  const jobFinItems = (job.jobFinishings || []).map((f) => {
+    const price = parseFloat(f.price) || 0;
+    const cost = f.basis === 'flat' ? price : price / 1000 * qty;
+    return { ...f, units: f.basis === 'flat' ? 1 : qty, cost };
+  });
+  const jobFinTotal = jobFinItems.reduce((s, f) => s + f.cost, 0);
+  const otherCost = parseFloat(job.otherCost) || 0;
+
+  const sub = productionSub + jobFinTotal + otherCost;
+  const perPcs = qty > 0 ? sub / qty : 0;
   return {
-    netSheets, wastePctSheets, setupWaste, printSheets, planoSheets,
-    passesFront, passesBack, passes, plates, billedPerPass,
-    plateCost, runCost, paperCost, finItems, finTotal, otherCost: other,
-    sub, perPcs, sell, sellPer, profit, effMarginPct, effMarkupPct,
-    ppn, sellIncl, sellInclPer,
+    components, productionSub, jobFinItems, jobFinTotal, otherCost, sub, perPcs,
+    ...applyPricing(sub, qty, job),
   };
 }
 

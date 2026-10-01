@@ -17,7 +17,9 @@ Panduan ini menjelaskan cara pakai Pricelab dari nol, lengkap dengan **dua conto
 | **Bleed** | Kelebihan gambar di luar garis potong (biasanya 3 mm tiap sisi). A5 14,8 × 21 cm + bleed = 15,4 × 21,6 cm. |
 | **Pass** | Satu kali kertas lewat mesin. Mesin 4 unit warna mencetak CMYK dalam 1 pass. Cetak bolak-balik 4/4 = 2 pass. |
 | **Plat** | 1 plat per warna per sisi. Cetak 4/4 = 8 plat, 4/0 = 4 plat, 1/1 = 2 plat. |
-| **Inschiet / kertas setting** | Lembar yang terbuang saat operator menyetel warna di awal tiap pass. |
+| **Inschiet / kertas setting** | Lembar yang terbuang saat operator menyetel warna di awal tiap pass. Jumlahnya tergantung mesin, jadi disimpan di data Mesin. |
+| **Komponen** | Bagian produk yang dicetak terpisah. Buku = komponen *Isi* + komponen *Cover*. Brosur cuma punya 1 komponen. |
+| **Layout campuran** | Sebagian item disusun berdiri, sebagian tidur di satu lembar supaya muat lebih banyak. |
 | **Waste rusak (%)** | Lembar rusak selama produksi & finishing, dihitung persen dari lembar bersih. |
 | **4/4, 4/0, 1/1** | Jumlah warna sisi depan / sisi belakang. 4/0 = full color 1 sisi. |
 | **Markup vs Margin** | Markup 30% = untung 30% **dari HPP**. Margin 30% = untung 30% **dari harga jual**. Markup 30% sama dengan margin ± 23%. |
@@ -33,6 +35,7 @@ Untuk tiap mesin isi:
 - **Plate / CTP /plat** — harga satu plat.
 - **Min. Ongkos Cetak** — order di bawah jumlah ini tetap ditagih sejumlah ini **per pass** (bukan menambah kertas).
 - **Unit Warna** — berapa warna sekali jalan (SM52 = 4).
+- **Kertas Setting** — berapa lembar terbuang tiap kali operator menyetel mesin ini (per pass). Tanyakan ke operator. Angka ini otomatis dipakai saat mesin dipilih di Hitung HPP. Data contoh: SM52 50, Ryobi 30, Komori 80.
 
 ### Menu **Material**
 Yang paling sering salah di sini: **harga kertas**.
@@ -47,11 +50,11 @@ Contoh: Art Paper 120 gsm 65 × 100, Rp 180.000 per rim → Harga 180000, Isi 50
 
 ## 3. Contoh 1 — Brosur A5 full color bolak-balik
 
-**Order:** Brosur A5, 2.000 pcs, cetak 4/4 (CMYK dua sisi), Art Paper 120 gsm, laminasi doff 1 sisi. Customer minta faktur pajak (PPN 11%). Untung yang diinginkan: markup 30%.
+**Order:** Brosur A5, 2.000 pcs, cetak 4/4 (CMYK dua sisi), Art Paper 120 gsm, laminasi doff 1 sisi, dipotong jadi A5. Customer minta faktur pajak (PPN 11%). Untung yang diinginkan: markup 30%.
 
 ### Langkah A — Plano & Imposition
 
-Buka menu **Plano & Imposition**, isi:
+Buka menu **Plano & Imposition**. Saat pertama dibuka, plano masih utuh 65 × 100 dan akan muncul peringatan kuning bahwa lembar itu tidak muat di mesin mana pun — itu normal. Isi:
 
 | Field | Isi | Kenapa |
 |---|---|---|
@@ -62,7 +65,7 @@ Buka menu **Plano & Imposition**, isi:
 | Gripper Atas-Bawah | 1 | Jepitan mesin |
 | Hasil Jadi Lebar × Tinggi | **15.4 × 21.6** | A5 + bleed 3 mm tiap sisi |
 | Gap H / Gap V | 0 / 0 | Bleed sudah termasuk di ukuran, jadi item boleh nempel |
-| Mode Layout | Best Fit | |
+| Mode Layout | Best Fit (+campuran) | Aplikasi mencoba semua susunan, termasuk campuran berdiri + tidur |
 
 **Hasil yang harus muncul:**
 - **Muat: 8 pcs / lembar cetak** (susunan 4 × 2)
@@ -73,6 +76,8 @@ Buka menu **Plano & Imposition**, isi:
 Klik **Gunakan hasil ini di Hitung HPP**. Ukuran plano, cara potong, pcs per lembar, dan mesin otomatis terisi di halaman HPP.
 
 > Kalau kamu coba pilih **Utuh (1)**, akan muncul peringatan kuning bahwa 65 × 100 terlalu besar untuk SM52. Itu tanda kamu harus potong plano.
+>
+> Kalau belum memilih mesin di *Cek Muat di Mesin*, aplikasi tetap menampilkan daftar mesin yang muat untuk ukuran lembar itu.
 
 ### Langkah B — Hitung HPP
 
@@ -80,18 +85,19 @@ Di menu **Hitung HPP** (sebagian sudah terisi dari langkah A), lengkapi:
 
 | Bagian | Field | Isi |
 |---|---|---|
-| Produk | Nama Produk | Brosur A5 4/4 Art Paper 120 |
-| | Jenis Produk | Single Sheet |
-| | Jumlah Order | 2000 |
+| Produk Jadi | Nama Produk | Brosur A5 4/4 Art Paper 120 |
+| | Jumlah Produk Jadi | 2000 |
+| Komponen | (biarkan 1 komponen "Utama", Jenis Cetak: Lembaran, Jumlah per Produk: 1) | |
 | Layout & Waste | Potong Plano Jadi | ½ plano (2) — *sudah terisi* |
 | | Pcs per Lembar Cetak | 8 — *sudah terisi* |
 | | Waste Rusak | 3 % |
-| | Kertas Setting (Inschiet) | 50 lbr / pass |
-| Mesin | Pilih Mesin | Heidelberg SM52 — *sudah terisi* (harga lari 85.000, plat 45.000, min 500, 4 unit warna) |
+| | Kertas Setting (Inschiet) | 50 lbr / pass — *otomatis dari data mesin SM52* |
+| Mesin | Pilih Mesin | Heidelberg SM52 — *sudah terisi* (harga lari 85.000, plat 45.000, min 500, 4 unit warna, setting 50) |
 | | Warna Sisi Depan | 4 warna (CMYK) |
 | | Warna Sisi Belakang | **4 warna (CMYK)** |
 | Kertas | Pilih Material | Art Paper 120gsm (harga 180.000 / 500 lbr terisi otomatis) |
-| Finishing | klik preset **+ Laminasi** | 150.000, basis **/ 1000 lbr cetak** |
+| Finishing | klik preset **+ Laminasi** | 150.000, basis **/ 1000 lbr cetak**, Sisi **1 sisi** |
+| | klik preset **+ Potong (mesin potong)** | 50.000, basis **/ 1000 lbr cetak** |
 | Biaya Lain & Pajak | PPN | 11 |
 | Harga jual | Cara Hitung Untung | Markup (% dari HPP) |
 | | Markup | 30 |
@@ -115,52 +121,63 @@ Di menu **Hitung HPP** (sebagian sudah terisi dari langkah A), lengkapi:
 | Plate / CTP | 8 plat (4 depan + 4 belakang) × 45.000 | Rp 360.000 |
 | Ongkos cetak | 358 lbr < minimum 500 → ditagih 500 lbr × 2 pass × 85.000/1000 | Rp 85.000 |
 | Kertas | 179 plano ÷ 500 × 180.000 | Rp 64.440 |
-| Finishing (laminasi) | 250 lbr bersih × 150.000/1000 | Rp 37.500 |
-| **Total HPP** | | **Rp 546.940** (Rp 273/pcs) |
+| Finishing — laminasi | 250 lbr bersih × 150.000/1000 × 1 sisi | Rp 37.500 |
+| Finishing — potong | 250 lbr bersih × 50.000/1000 | Rp 12.500 |
+| **Total HPP** | | **Rp 559.440** (Rp 280/pcs) |
 
 **Harga jual**
 
 | | Hitungan | Hasil |
 |---|---|---|
-| Harga jual (sebelum PPN) | 546.940 × 1,30 | **Rp 711.022** (Rp 356/pcs) |
-| Untung | 711.022 − 546.940 | Rp 164.082 → margin 23,1%, markup 30% |
-| PPN 11% | 711.022 × 11% | Rp 78.212 |
-| **Harga + PPN** | | **Rp 789.234** (Rp 395/pcs) |
+| Harga jual (sebelum PPN) | 559.440 × 1,30 | **Rp 727.272** (Rp 364/pcs) |
+| Untung | 727.272 − 559.440 | Rp 167.832 → margin 23,1%, markup 30% |
+| PPN 11% | 727.272 × 11% | Rp 80.000 |
+| **Harga + PPN** | | **Rp 807.272** (Rp 404/pcs) |
 
 Klik **Simpan Kalkulasi** → tombol berubah jadi "Tersimpan ✓" dan kalkulasi masuk ke **Histori**.
 
 ### Cara membaca angka ini
-- **Plat adalah biaya terbesar (66% HPP).** Untuk order kecil, biaya plat mendominasi. Coba ubah Jumlah Order ke 5.000 — HPP/pcs akan turun drastis karena plat dibagi ke lebih banyak pcs. Ini dasar untuk kasih harga bertingkat ke customer.
+- **Plat adalah biaya terbesar (64% HPP).** Untuk order kecil, biaya plat mendominasi. Coba ubah Jumlah Produk Jadi ke 5.000 — HPP/pcs akan turun drastis karena plat dibagi ke lebih banyak pcs. Ini dasar untuk kasih harga bertingkat ke customer.
 - **Minimum ongkos cetak kena.** 358 lembar ditagih seperti 500 lembar. Kertas tetap dihitung 358 lembar (tidak ikut dibulatkan).
 - **Bolak-balik tidak menggandakan kertas.** Sisi belakang dicetak di lembar yang sama; yang bertambah hanya plat, pass, dan kertas setting.
 
 ---
 
-## 4. Contoh 2 — Buku A5 (isi + cover)
+## 4. Contoh 2 — Buku A5 (produk multi-komponen)
 
 **Order:** Buku A5, 500 eksemplar. Isi 48 halaman hitam-putih (1/1) HVS 70 gsm. Cover full color 1 sisi (4/0) Ivory 230 gsm + laminasi doff. Jilid lem. Tanpa PPN, markup 30%.
 
-Buku dihitung **dua kali**: sekali untuk **isi**, sekali untuk **cover**, lalu dijumlahkan. Ini karena kertas, warna, dan ukuran cetak isi dan cover berbeda.
+Buku terdiri dari **2 komponen** yang kertas, warna, dan ukuran cetaknya beda: **Isi** dan **Cover**. Keduanya dihitung dalam **satu kalkulasi**, lalu ditambah **jilid** sebagai finishing produk jadi.
 
-### 4a. Isi buku
+### 4a. Siapkan produk dari template
 
-**Plano & Imposition:** plano 65 × 100, potong ½ (65 × 50), margin 0.5, gripper 1, hasil jadi **15.4 × 21.6** (1 halaman A5 + bleed), gap 0 → **8 halaman per sisi lembar**. Klik *Gunakan hasil ini*.
-
-**Hitung HPP:**
+Di **Hitung HPP**:
 
 | Field | Isi |
 |---|---|
-| Jenis Produk | **Isi Buku / Booklet** |
-| Jumlah Buku | 500 |
-| Jumlah Halaman Isi | 48 (tanpa cover) |
-| Halaman per Sisi Lembar | 8 |
-| Waste / Setting | 3 % / 50 lbr per pass |
-| Mesin | Heidelberg SM52 |
-| Warna Depan / Belakang | 1 / 1 |
-| Material | HVS 70gsm (95.000 / 500) |
-| Finishing | **+ Lem / Jilid** (120.000 / 1000 pcs) |
+| Mulai dari Template | **Buku / Booklet (isi + cover)** → klik OK |
+| Nama Produk | Buku A5 48 hal |
+| Jumlah Produk Jadi | 500 |
+| PPN | 0 |
 
-**Hasil:**
+Template otomatis membuat:
+- tab komponen **Isi** (Jenis Cetak: Halaman buku, 48 halaman, 1/1, potong ½, 8 halaman per sisi)
+- tab komponen **Cover** (Lembaran, 4/0, potong ¼, 2 per lembar)
+- **Finishing Produk Jadi:** Lem / Jilid 120.000 / 1000 produk
+
+Template hanya mengganti komponen — nama produk, jumlah, markup, dan PPN tidak ikut di-reset. Kamu tinggal melengkapi mesin, kertas, dan finishing tiap komponen.
+
+### 4b. Komponen Isi
+
+**(Opsional) Plano & Imposition:** plano 65 × 100, potong ½ (65 × 50), margin 0.5, gripper 1, hasil jadi **15.4 × 21.6** (1 halaman A5 + bleed), gap 0 → **8 halaman per sisi lembar**. Di *Kirim ke Komponen* pilih **Isi**, lalu klik *Gunakan hasil ini*. Template sudah mengisi angka yang sama, jadi langkah ini cuma untuk memastikan.
+
+Klik tab **Isi** di Hitung HPP, lengkapi:
+
+| Field | Isi |
+|---|---|
+| Pilih Mesin | Heidelberg SM52 (kertas setting 50 terisi otomatis) |
+| Waste Rusak | 3 % |
+| Pilih Material | HVS 70gsm (95.000 / 500) |
 
 | | Hitungan | Hasil |
 |---|---|---|
@@ -171,18 +188,20 @@ Buku dihitung **dua kali**: sekali untuk **isi**, sekali untuk **cover**, lalu d
 | Plat | 2 × 45.000 | Rp 90.000 |
 | Ongkos cetak | 2 pass × 1.645/1000 × 85.000 | Rp 279.650 |
 | Kertas | 823 ÷ 500 × 95.000 | Rp 156.370 |
-| Jilid | 500 eks × 120.000/1000 | Rp 60.000 |
-| **HPP isi** | | **Rp 586.020** |
+| **HPP komponen Isi** | | **Rp 526.020** |
 
-Simpan, beri nama mis. "Buku A5 48hal — ISI".
+### 4c. Komponen Cover
 
-### 4b. Cover
+**(Opsional) Plano & Imposition:** potong **¼ (32.5 × 50)**, margin 0.5, gripper 1. Hasil jadi = cover terbuka: 2 × 14,8 (depan + belakang) + 0,4 punggung + 0,6 bleed = **30.6** × **21.6** → **2 cover per lembar**. *Kirim ke Komponen*: **Cover**.
 
-Klik **Reset**, lalu:
+Klik tab **Cover**, lengkapi:
 
-**Plano & Imposition:** plano 65 × 100, potong **¼ (32.5 × 50)**, margin 0.5, gripper 1. Hasil jadi = cover terbuka: 2 × 14,8 (depan + belakang) + 0,4 punggung + 0,6 bleed = **30.6** × **21.6** → **2 cover per lembar**.
-
-**Hitung HPP:** Single Sheet, qty 500, pcs per lembar 2, potong ¼, waste 3% / setting 50, SM52, warna 4 / **Tidak dicetak**, material Ivory 230gsm (285.000 / 500), finishing **+ Laminasi** (150.000 / 1000 lbr cetak).
+| Field | Isi |
+|---|---|
+| Pilih Mesin | Heidelberg SM52 |
+| Waste Rusak | 3 % |
+| Pilih Material | Ivory 230gsm (285.000 / 500) |
+| Finishing | **+ Laminasi** (150.000 / 1000 lbr cetak, 1 sisi) |
 
 | | Hitungan | Hasil |
 |---|---|---|
@@ -192,18 +211,40 @@ Klik **Reset**, lalu:
 | Ongkos cetak | min 500 lbr × 1 pass | Rp 42.500 |
 | Kertas | 77 ÷ 500 × 285.000 | Rp 43.890 |
 | Laminasi | 250 lbr × 150.000/1000 | Rp 37.500 |
-| **HPP cover** | | **Rp 303.890** |
+| **HPP komponen Cover** | | **Rp 303.890** |
 
-### 4c. Total buku
+### 4d. Total buku (muncul otomatis di panel Rincian HPP)
 
 | | |
 |---|---|
-| HPP isi | Rp 586.020 |
-| HPP cover | Rp 303.890 |
-| **HPP buku** | **Rp 889.910 → Rp 1.780 / eks** |
+| Isi | Rp 526.020 |
+| Cover | Rp 303.890 |
+| Finishing produk jadi — jilid | 500 × 120.000/1000 = Rp 60.000 (anggap sudah termasuk potong 3 sisi) |
+| **Total HPP buku** | **Rp 889.910 → Rp 1.780 / eks** |
 | Harga jual (markup 30%) | Rp 1.156.883 → Rp 2.314 / eks |
 
+Klik **Simpan Kalkulasi**. Di Histori akan tercatat satu baris "Buku A5 48 hal" dengan keterangan *Isi + Cover*.
+
 > Ketebalan punggung (0,4 cm di contoh) tergantung jumlah halaman & gramatur kertas isi. Tanyakan ke bagian produksi / ukur dummy sebelum hitung cover.
+
+### Produk multi-komponen lainnya
+
+- **Kalender meja:** pakai template *Kalender meja*. Komponen *Lembar bulan* punya **Jumlah per Produk = 13** (12 bulan + 1 sampul), jadi 100 kalender = 1.300 lembar bulan dicetak. Isi harga ring di Finishing Produk Jadi.
+- **Produk lain** (box + sekat, map + isi, dll.): klik **+ Komponen** untuk menambah bagian, **Duplikat** untuk menyalin komponen yang mirip, ikon tempat sampah untuk menghapus.
+- Finishing yang dikerjakan **per lembar / per komponen** (laminasi, potong, pond) → masuk ke *Finishing* di tab komponennya. Finishing yang dikerjakan **setelah semua komponen jadi** (jilid, ring, rakit, packing) → masuk ke *Finishing Produk Jadi*.
+
+---
+
+## 4½. Layout campuran
+
+Di **Plano & Imposition** mode **Best Fit (+campuran)**, aplikasi tidak cuma mencoba "semua berdiri" atau "semua tidur", tapi juga **campuran**: sebagian item berdiri, sisa ruangnya diisi item tidur.
+
+Contoh: lembar 70 × 50 cm, item 20 × 30 cm, tanpa margin:
+- Semua berdiri: 3 pcs
+- Semua tidur: 4 pcs
+- **Campuran: 5 pcs** (3 berdiri + 2 tidur)
+
+Di preview, item berdiri berwarna **biru** dan item tidur **hijau**, dan muncul keterangan *campuran*. Layout campuran lebih hemat kertas tapi pemotongannya lebih banyak langkah — kalau operator tidak mau, pilih mode **Portrait** atau **Landscape**.
 
 ---
 
@@ -216,6 +257,7 @@ Klik **Reset**, lalu:
 | *Ukuran plano di layout beda dengan kertas …* | Ukuran plano di HPP tidak sama dengan ukuran material yang dipilih. Samakan dulu, kalau tidak hitungan kertas salah. |
 | *Jumlah halaman … bukan kelipatan 4* | Buku jilid biasanya kelipatan 4 (bahkan 8/16). Tambah halaman kosong. |
 | *Pcs per lembar cetak masih 0* | Hitung dulu di Plano & Imposition, atau ukuran hasil jadi lebih besar dari lembar cetak. |
+| *[Isi] …, [Cover] …* | Kalau produk punya beberapa komponen, nama komponen yang bermasalah ditulis di depan peringatan. |
 
 ---
 
@@ -235,14 +277,16 @@ Klik **Reset**, lalu:
 2. **Lupa bleed.** Ukuran hasil jadi di Plano harus termasuk bleed kalau desainnya full bleed.
 3. **Cetak bolak-balik tapi Warna Sisi Belakang masih "Tidak dicetak".** Plat & pass jadi kurang setengah.
 4. **Menganggap markup = margin.** Kalau target kamu "untung 30% dari harga jual", pilih mode **Margin**.
-5. **Basis finishing salah.** Laminasi/UV/pond biasanya per lembar cetak (dikerjakan sebelum dipotong); poly/emboss/jilid per pcs; pisau pond dibayar sekali (flat).
+5. **Basis finishing salah.** Laminasi/UV/pond/potong biasanya per lembar cetak (dikerjakan sebelum dipotong jadi pcs); poly/emboss/jilid per pcs; pisau pond dibayar sekali (flat).
+6. **Laminasi 2 sisi tapi kolom Sisi masih "1 sisi".** Biaya laminasi jadi setengahnya. Kolom *Sisi* ada di tiap baris finishing.
+7. **Lupa biaya potong.** Semua produk yang dicetak lebih dari 1 per lembar (brosur, kartu nama, label) perlu dipotong — tambahkan preset **+ Potong (mesin potong)**.
 
 ---
 
 ## 8. Batasan yang masih ada
 
-- Buku dihitung isi & cover terpisah (belum ada mode multi-komponen dalam satu kalkulasi).
-- Imposition hanya grid seragam (belum mendukung layout campuran portrait + landscape di satu lembar).
+- Layout campuran maksimal 2 blok (1 blok berdiri + 1 blok tidur). Susunan yang lebih rumit belum dicoba.
+- Belum ada cetak numpang (biaya plat dibagi beberapa order) dan cetak digital.
 - Tebal pisau potong plano tidak diperhitungkan.
 - Harga lari sama untuk 1 warna maupun 4 warna di mesin yang sama.
 - Data masih tersimpan di browser (localStorage) — belum bisa dipakai bersama satu tim.

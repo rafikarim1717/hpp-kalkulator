@@ -194,6 +194,10 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--sans); }
 }
 .field-with-suffix { position: relative; }
 .field-with-suffix input { padding-right: 36px; }
+/* Sembunyikan spinner angka supaya tidak menutupi teks satuan */
+.field-with-suffix input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.field-with-suffix input[type="number"]::-webkit-inner-spin-button,
+.field-with-suffix input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* Section header */
 .section-eyebrow {
@@ -478,6 +482,30 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--sans); }
   border: 1px solid color-mix(in oklch, var(--accent) 15%, transparent);
 }
 
+/* Tab komponen di Hitung HPP */
+.comp-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.comp-tab {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  min-width: 130px; padding: 10px 14px; text-align: left; cursor: pointer;
+  font: inherit; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  transition: border-color 0.15s, background 0.15s;
+}
+.comp-tab:hover { border-color: var(--border-strong); }
+.comp-tab.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.comp-tab-name { font-size: 13px; font-weight: 500; }
+.comp-tab-sub { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); }
+.comp-tab-add { flex-direction: row; align-items: center; justify-content: center; gap: 6px; min-width: auto; border-style: dashed; }
+
+.fin-cost {
+  padding: var(--pad-input);
+  line-height: normal;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  color: var(--text);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
 .alert-warn {
   background: color-mix(in oklch, var(--warn) 12%, transparent);
   color: oklch(0.42 0.13 65);
@@ -599,7 +627,10 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--sans); }
 /* Finishing row */
 .fin-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1.3fr auto;
+  grid-template-columns: 1fr 0.8fr 0.8fr 1fr auto;
+  grid-template-areas:
+    "name  name  name  cost  del"
+    "price basis basis sides .";
   gap: 10px;
   align-items: end;
   padding: 12px;
@@ -727,7 +758,10 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--sans); }
   .main { padding: 22px 18px 80px; }
   .page-title { font-size: 30px; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-  .fin-row { grid-template-columns: 1fr 1fr; }
+  .fin-row {
+    grid-template-columns: 1fr 1fr auto;
+    grid-template-areas: "name name del" "price basis basis" "sides cost cost";
+  }
 }
 @media (max-width: 560px) {
   .login-card { padding: 28px; }

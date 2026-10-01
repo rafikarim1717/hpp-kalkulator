@@ -1,7 +1,7 @@
 export const DEFAULT_TOOLS = [
-  { id: 1, name: 'Heidelberg SM52', brand: 'Heidelberg', maxw: 52, maxh: 74, minw: 10, minh: 15, runrate: 85000, plate: 45000, minorder: 500, maxcolor: 4, notes: 'Mesin 4 warna standar' },
-  { id: 2, name: 'Ryobi 524H', brand: 'Ryobi', maxw: 36, maxh: 52, minw: 8, minh: 12, runrate: 55000, plate: 35000, minorder: 300, maxcolor: 4, notes: 'Mesin compact serbaguna' },
-  { id: 3, name: 'Komori LS426', brand: 'Komori', maxw: 61, maxh: 86, minw: 15, minh: 20, runrate: 110000, plate: 55000, minorder: 1000, maxcolor: 6, notes: 'Mesin besar 6 warna' },
+  { id: 1, name: 'Heidelberg SM52', brand: 'Heidelberg', maxw: 52, maxh: 74, minw: 10, minh: 15, runrate: 85000, plate: 45000, minorder: 500, maxcolor: 4, setup: 50, notes: 'Mesin 4 warna standar' },
+  { id: 2, name: 'Ryobi 524H', brand: 'Ryobi', maxw: 36, maxh: 52, minw: 8, minh: 12, runrate: 55000, plate: 35000, minorder: 300, maxcolor: 4, setup: 30, notes: 'Mesin compact serbaguna' },
+  { id: 3, name: 'Komori LS426', brand: 'Komori', maxw: 61, maxh: 86, minw: 15, minh: 20, runrate: 110000, plate: 55000, minorder: 1000, maxcolor: 6, setup: 80, notes: 'Mesin besar 6 warna' },
 ];
 
 export const DEFAULT_MATERIALS = [
@@ -32,7 +32,8 @@ export const ITEM_PRESETS = [
 // basis: per1000pcs = per 1000 pcs hasil jadi, per1000lembar = per 1000 lembar cetak, flat = sekali bayar
 export const FINISHING_PRESETS = [
   { name: 'Laminasi', price: 150000, basis: 'per1000lembar' },
-  { name: 'Pond / Cutting', price: 200000, basis: 'per1000lembar' },
+  { name: 'Potong (mesin potong)', price: 50000, basis: 'per1000lembar' },
+  { name: 'Pond (die-cut)', price: 200000, basis: 'per1000lembar' },
   { name: 'Pisau Pond (sekali)', price: 350000, basis: 'flat' },
   { name: 'Poly', price: 180000, basis: 'per1000pcs' },
   { name: 'Lem / Jilid', price: 120000, basis: 'per1000pcs' },
@@ -49,45 +50,124 @@ export const FINISHING_BASIS = [
 
 export const PAPER_TYPES = ['HVS', 'Art Paper', 'Art Carton', 'Ivory', 'Duplex', 'Kraft', 'Coated', 'Uncoated', 'Lainnya'];
 
-export const DEFAULT_HPP_STATE = () => ({
-  name: '', type: 'single', qty: 1000, pages: 16,
+// Finishing produk jadi (dikerjakan setelah semua komponen jadi). basis: per1000pcs = per 1000 produk jadi
+export const JOB_FINISHING_PRESETS = [
+  { name: 'Lem / Jilid', price: 120000, basis: 'per1000pcs' },
+  { name: 'Jilid Kawat / Steples', price: 0, basis: 'per1000pcs' },
+  { name: 'Ring / Spiral', price: 0, basis: 'per1000pcs' },
+  { name: 'Rakit / Packing', price: 0, basis: 'per1000pcs' },
+  { name: 'Custom', price: 0, basis: 'per1000pcs' },
+];
+
+export const JOB_FINISHING_BASIS = [
+  { value: 'per1000pcs', label: '/ 1000 produk' },
+  { value: 'flat', label: 'flat (sekali)' },
+];
+
+let _id = 0;
+export const newId = () => `${Date.now().toString(36)}-${(_id++).toString(36)}`;
+
+// Satu komponen = satu bagian produk yang dicetak (mis. isi buku, cover, lembar kalender)
+export const DEFAULT_COMPONENT = (patch = {}) => ({
+  id: newId(), name: 'Utama', type: 'single', perProduct: 1, pages: 16,
   // layout (diisi dari Plano & Imposition)
   planoW: 65, planoH: 100, planoCut: 1, pcsPerSheet: 4,
   // waste
-  wastePct: 5, setupSheets: 0,
+  wastePct: 5, setupSheets: 50,
   // mesin
   machineId: '', colorsFront: 4, colorsBack: 0, maxColor: 4,
   runRate: 85000, platePrice: 45000, minRun: 500,
   // kertas
   paperId: '', paperPrice: 180000, sheetsPerPack: 500,
-  // lain-lain
-  finishings: [], otherCost: 0,
-  pricingMode: 'markup', marginPct: 30, ppnPct: 0,
+  finishings: [],
+  ...patch,
 });
+
+// Satu kalkulasi = satu produk jadi, berisi satu atau lebih komponen
+export const DEFAULT_HPP_STATE = () => {
+  const c = DEFAULT_COMPONENT();
+  return {
+    name: '', qty: 1000,
+    components: [c], activeComponentId: c.id,
+    jobFinishings: [], otherCost: 0,
+    pricingMode: 'markup', marginPct: 30, ppnPct: 0,
+  };
+};
+
+// Template awal supaya user tidak perlu tahu sendiri komponen apa saja yang dibutuhkan
+export const PRODUCT_TEMPLATES = [
+  {
+    id: 'single', label: 'Single (brosur, kartu nama, poster)',
+    build: () => ({ components: [DEFAULT_COMPONENT()], jobFinishings: [] }),
+  },
+  {
+    id: 'book', label: 'Buku / Booklet (isi + cover)',
+    build: () => ({
+      components: [
+        DEFAULT_COMPONENT({ name: 'Isi', type: 'book', pages: 48, colorsFront: 1, colorsBack: 1, planoCut: 2, pcsPerSheet: 8 }),
+        DEFAULT_COMPONENT({ name: 'Cover', planoCut: 4, pcsPerSheet: 2 }),
+      ],
+      jobFinishings: [{ id: newId(), name: 'Lem / Jilid', price: 120000, basis: 'per1000pcs' }],
+    }),
+  },
+  {
+    id: 'calendar', label: 'Kalender meja (lembar bulan + alas)',
+    build: () => ({
+      components: [
+        DEFAULT_COMPONENT({ name: 'Lembar bulan', perProduct: 13 }),
+        DEFAULT_COMPONENT({ name: 'Alas / dudukan', colorsFront: 4, colorsBack: 0 }),
+      ],
+      jobFinishings: [{ id: newId(), name: 'Ring / Spiral', price: 0, basis: 'per1000pcs' }],
+    }),
+  },
+];
 
 export const DEFAULT_PLANO_STATE = {
   planoW: 65, planoH: 100, planoCut: 1, itemW: 9, itemH: 5.5,
   bleedX: 0.3, bleedY: 0.5, gapX: 0.2, gapY: 0.2, mode: 'best', machineId: '',
 };
 
-// ── Migrasi data lama di localStorage (versi sebelum perbaikan rumus) ───────
-export function normalizeHppState(raw) {
-  const s = { ...DEFAULT_HPP_STATE(), ...(raw || {}) };
-  if (raw && raw.pcsPerPlano != null && raw.pcsPerSheet == null) { s.pcsPerSheet = raw.pcsPerPlano; s.planoCut = 1; }
-  if (raw && raw.extraPct != null && raw.wastePct == null) s.wastePct = raw.extraPct;
+// ── Migrasi data lama di localStorage ───────────────────────────────────────
+// Versi 1 (bundle asli) dan versi 2 (satu komponen, field datar) diubah ke format produk + komponen.
+function normalizeComponent(raw) {
+  const c = DEFAULT_COMPONENT(raw || {});
+  if (raw && raw.pcsPerPlano != null && raw.pcsPerSheet == null) { c.pcsPerSheet = raw.pcsPerPlano; c.planoCut = 1; }
+  if (raw && raw.extraPct != null && raw.wastePct == null) c.wastePct = raw.extraPct;
   if (raw && raw.colors != null && raw.colorsFront == null) {
-    s.colorsFront = raw.colors;
-    s.colorsBack = Number(raw.duplex) === 2 ? raw.colors : 0;
+    c.colorsFront = raw.colors;
+    c.colorsBack = Number(raw.duplex) === 2 ? raw.colors : 0;
   }
-  if (raw && raw.minOrder != null && raw.minRun == null) s.minRun = raw.minOrder;
-  s.finishings = (s.finishings || []).map((f) => ({ basis: 'per1000pcs', ...f }));
-  delete s.pcsPerPlano; delete s.extraPct; delete s.colors; delete s.duplex; delete s.minOrder;
-  return s;
+  if (raw && raw.minOrder != null && raw.minRun == null) c.minRun = raw.minOrder;
+  if (raw && raw.setupSheets == null) c.setupSheets = 0; // data lama belum punya kertas setting
+  c.finishings = (c.finishings || []).map((f) => ({ basis: 'per1000pcs', sides: 1, ...f }));
+  for (const k of ['pcsPerPlano', 'extraPct', 'colors', 'duplex', 'minOrder', 'qty', 'otherCost', 'pricingMode', 'marginPct', 'ppnPct', 'components', 'activeComponentId', 'jobFinishings']) delete c[k];
+  return c;
+}
+
+export function normalizeHppState(raw) {
+  const base = DEFAULT_HPP_STATE();
+  if (!raw) return base;
+  if (Array.isArray(raw.components) && raw.components.length > 0) {
+    const components = raw.components.map(normalizeComponent);
+    const active = components.find((c) => c.id === raw.activeComponentId) ? raw.activeComponentId : components[0].id;
+    return { ...base, ...raw, components, activeComponentId: active, jobFinishings: raw.jobFinishings || [] };
+  }
+  // Format lama: satu objek datar
+  const comp = normalizeComponent({ ...raw, name: 'Utama', perProduct: 1 });
+  return {
+    ...base,
+    name: raw.name || '', qty: raw.qty ?? base.qty,
+    otherCost: raw.otherCost ?? 0, pricingMode: raw.pricingMode || 'markup',
+    marginPct: raw.marginPct ?? base.marginPct, ppnPct: raw.ppnPct ?? 0,
+    components: [comp], activeComponentId: comp.id, jobFinishings: [],
+  };
 }
 
 export const normalizeMaterial = (m) => {
   const { satuan, ...rest } = m;
   return { isi: 500, ...rest };
 };
+
+export const normalizeTool = (t) => ({ setup: 50, ...t });
 
 export const normalizePlanoState = (raw) => ({ ...DEFAULT_PLANO_STATE, ...(raw || {}) });

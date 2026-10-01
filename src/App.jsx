@@ -6,7 +6,7 @@ import { TweakRadio, TweakSection, TweakSlider, TweaksPanel, useTweaks } from '.
 import { useLocalState } from './hooks/useLocalState.js';
 import {
   DEFAULT_HPP_STATE, DEFAULT_MATERIALS, DEFAULT_PLANO_STATE, DEFAULT_TOOLS,
-  normalizeHppState, normalizeMaterial, normalizePlanoState,
+  normalizeHppState, normalizeMaterial, normalizePlanoState, normalizeTool,
 } from './lib/constants.js';
 import HistoryPage from './pages/HistoryPage.jsx';
 import HppPage from './pages/HppPage.jsx';
@@ -32,7 +32,7 @@ const NAV = [
 const App = () => {
   const [user, setUser] = useLocalState('pl_user', null);
   const [page, setPage] = useLocalState('pl_page', 'plano');
-  const [tools, setTools] = useLocalState('pl_tools', DEFAULT_TOOLS);
+  const [tools, setTools] = useLocalState('pl_tools', DEFAULT_TOOLS, (list) => list.map(normalizeTool));
   const [materials, setMaterials] = useLocalState('pl_materials', DEFAULT_MATERIALS, (list) => list.map(normalizeMaterial));
   const [history, setHistory] = useLocalState('pl_history', []);
   const [planoState, setPlanoState] = useLocalState('pl_plano', DEFAULT_PLANO_STATE, normalizePlanoState);
@@ -42,6 +42,13 @@ const App = () => {
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
 
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const mainRef = React.useRef(null);
+
+  // Mulai dari atas tiap pindah halaman (supaya banner/peringatan di atas kelihatan)
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [page]);
 
   // Apply tweaks to body
   React.useEffect(() => {
@@ -65,16 +72,23 @@ const App = () => {
     {tweaksPanel}
   </>;
 
-  const sendToHpp = (layout) => {
+  // Kirim hasil layout ke satu komponen di Hitung HPP
+  const sendToHpp = (layout, componentId) => {
     const { machineId, ...rest } = layout;
+    const targetId = componentId || hppState.activeComponentId;
+    const target = hppState.components.find((c) => c.id === targetId) || hppState.components[0];
     const patch = { ...rest };
-    // ikut pilih mesin kalau di Plano dicek dan di HPP belum dipilih
+    // ikut pilih mesin kalau di Plano dicek dan komponen ini belum punya mesin
     const t = tools.find((x) => String(x.id) === String(machineId));
-    if (t && !hppState.machineId) {
-      Object.assign(patch, { machineId, maxColor: t.maxcolor, runRate: t.runrate, platePrice: t.plate, minRun: t.minorder });
+    if (t && !target.machineId) {
+      Object.assign(patch, { machineId, maxColor: t.maxcolor, runRate: t.runrate, platePrice: t.plate, minRun: t.minorder, setupSheets: t.setup ?? target.setupSheets });
     }
-    setFromPlano({ ...layout, acked: false });
-    setHppState({ ...hppState, ...patch });
+    setFromPlano({ ...layout, componentName: target.name, acked: false });
+    setHppState({
+      ...hppState,
+      components: hppState.components.map((c) => (c.id === target.id ? { ...c, ...patch } : c)),
+      activeComponentId: target.id,
+    });
     setPage('hpp');
   };
   const ackFromPlano = () => setFromPlano(null);
@@ -85,6 +99,7 @@ const App = () => {
       name: s.name, qty: s.qty,
       sub: result.sub, perPcs: result.perPcs, sell: result.sell, sellPer: result.sellPer,
       sellIncl: result.sellIncl,
+      components: s.components.map((c) => c.name),
       input: s, // snapshot lengkap supaya bisa dibuka lagi
     };
     setHistory([...history, entry]);
@@ -98,7 +113,8 @@ const App = () => {
 
   const renderPage = () => {
     switch (page) {
-      case 'plano': return <PlanoPage planoState={planoState} setPlanoState={setPlanoState} tools={tools} onSendToHpp={sendToHpp} />;
+      case 'plano': return <PlanoPage planoState={planoState} setPlanoState={setPlanoState} tools={tools}
+        components={hppState.components} activeComponentId={hppState.activeComponentId} onSendToHpp={sendToHpp} />;
       case 'hpp': return <HppPage hppState={hppState} setHppState={setHppState} tools={tools} materials={materials} onSave={saveCalc} fromPlano={fromPlano} ackFromPlano={ackFromPlano} />;
       case 'tools': return <ToolsPage tools={tools} setTools={setTools} />;
       case 'materials': return <MaterialsPage materials={materials} setMaterials={setMaterials} />;
@@ -155,7 +171,7 @@ const App = () => {
         </div>
       </div>
 
-      <main className="main">
+      <main className="main" ref={mainRef}>
         {renderPage()}
       </main>
     </div>
