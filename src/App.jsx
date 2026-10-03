@@ -14,6 +14,7 @@ import {
 } from './pages/MasterPages.jsx';
 import OffsetCalcPage, { newOffsetMedia } from './pages/OffsetCalcPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
+import { productFromTemplate } from './lib/templates.js';
 
 const TWEAK_DEFAULTS = {
   theme: 'warm',
@@ -91,6 +92,11 @@ const App = () => {
     setProducts([...products, p]);
     setOpenId(p.id);
   };
+  const fromTemplate = (tpl) => {
+    const p = productFromTemplate(tpl, master);
+    setProducts([...products, p]);
+    setOpenId(p.id);
+  };
   const duplicate = (id) => {
     const src = products.find((p) => p.id === id);
     if (!src) return;
@@ -109,7 +115,7 @@ const App = () => {
             onBack={() => setOpenId(null)} onDuplicate={() => duplicate(openProduct.id)} />;
         }
         return <ProductsPage kind={page} products={products} master={master} onOpen={setOpenId}
-          onNew={() => newProduct(page)} onDuplicate={duplicate} onDelete={remove} />;
+          onNew={() => newProduct(page)} onFromTemplate={fromTemplate} onDuplicate={duplicate} onDelete={remove} />;
       }
       case 'paper': return <PapersPage papers={papers} setPapers={setPapers} />;
       case 'machine': return <MachinesPage machines={machines} setMachines={setMachines} />;

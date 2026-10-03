@@ -70,6 +70,8 @@ function FinishingFields({ f, s, upd }) {
       return (
         <div className="grid-3">
           <Select label="Template / pisau" value={f.template} onChange={(v) => upd({ template: v })} options={opt(s.templates)} />
+          {f.includeTemplate && <NumField label="Panjang pisau per naik" suffix="cm" value={f.knifeLength || 0} onChange={(v) => upd({ knifeLength: v })}
+            hint="Kosong / 0 = pakai keliling hasil jadi" />}
           <div className="field" style={{ justifyContent: 'flex-end' }}><Check label="Termasuk biaya pisau" checked={f.includeTemplate} onChange={(v) => upd({ includeTemplate: v })} /></div>
         </div>
       );
@@ -97,8 +99,8 @@ function FinishingFields({ f, s, upd }) {
             </>
           ) : (
             <div className="grid-3">
-              <NumField label="Lebar poly" suffix="cm" value={f.w} onChange={(v) => upd({ w: v })} />
-              <NumField label="Tinggi poly" suffix="cm" value={f.h} onChange={(v) => upd({ h: v })} />
+              <NumField label="Lebar poly per pcs" suffix="cm" value={f.w} onChange={(v) => upd({ w: v })} />
+              <NumField label="Tinggi poly per pcs" suffix="cm" value={f.h} onChange={(v) => upd({ h: v })} />
               <div className="field" style={{ justifyContent: 'flex-end' }}><Check label="Termasuk template" checked={f.includeTemplate} onChange={(v) => upd({ includeTemplate: v })} /></div>
             </div>
           )}

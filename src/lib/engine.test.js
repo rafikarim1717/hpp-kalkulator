@@ -5,8 +5,9 @@ import {
   DEFAULT_OTHERS, DEFAULT_PAPERS, DEFAULT_SETTINGS, SAMPLE_BROSUR,
 } from './masterData.js';
 
+// Tes paritas dengan app Android: pakai mode pilih susunan "referensi"
 const master = {
-  settings: DEFAULT_SETTINGS, papers: DEFAULT_PAPERS, machines: DEFAULT_MACHINES,
+  settings: { ...DEFAULT_SETTINGS, autoLayout: 'reference' }, papers: DEFAULT_PAPERS, machines: DEFAULT_MACHINES,
   finishing: DEFAULT_FINISHING, others: DEFAULT_OTHERS,
   digitalPapers: DEFAULT_DIGITAL_PAPERS, digitalMachines: DEFAULT_DIGITAL_MACHINES,
 };

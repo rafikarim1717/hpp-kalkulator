@@ -274,6 +274,14 @@ export const SettingsPage = ({ settings, setSettings }) => {
             <NumField label="Bleed" suffix="cm" value={settings.bleed} onChange={(v) => set({ bleed: v })} hint="di tiap sisi" />
           </div>
         </div>
+        <div className="card">
+          <div className="section-eyebrow" style={{ marginBottom: 12 }}>Susunan otomatis (offset)</div>
+          <Select label="Kalau susunan tidak dipilih manual" value={settings.autoLayout || 'cheapest'} onChange={(v) => set({ autoLayout: v })}
+            options={[
+              { value: 'cheapest', label: 'Termurah yang muat semua mesin finishing (disarankan)' },
+              { value: 'reference', label: 'Sama dengan app Android: naik maksimal, kalau kebesaran langsung 1 naik' },
+            ]} />
+        </div>
         <div className="grid-2">
           <div className="card">
             <div className="section-eyebrow" style={{ marginBottom: 12 }}>Profit dihitung dari</div>

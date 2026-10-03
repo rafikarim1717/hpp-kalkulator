@@ -4,9 +4,11 @@ import { Icon } from '../components/Icon.jsx';
 import { Empty } from '../components/ui.jsx';
 import { calcDigital, calcOffset } from '../lib/engine.js';
 import { fmtNum, fmtRp } from '../lib/format.js';
+import { OFFSET_TEMPLATES, productFromTemplate } from '../lib/templates.js';
 
-const ProductsPage = ({ kind, products, master, onOpen, onNew, onDuplicate, onDelete }) => {
+const ProductsPage = ({ kind, products, master, onOpen, onNew, onFromTemplate, onDuplicate, onDelete }) => {
   const [q, setQ] = React.useState('');
+  const [showTpl, setShowTpl] = React.useState(false);
   const list = products.filter((p) => p.kind === kind && (!q || (p.name || '').toLowerCase().includes(q.toLowerCase())));
   const isOffset = kind === 'offset';
   return (
@@ -16,8 +18,38 @@ const ProductsPage = ({ kind, products, master, onOpen, onNew, onDuplicate, onDe
           <h1 className="page-title">{isOffset ? 'Offset' : 'Digital'} <em>Printing</em></h1>
           <div className="page-sub">Produk yang sudah dihitung. Klik untuk buka kalkulasinya.</div>
         </div>
-        <button className="btn btn-primary" onClick={onNew}><Icon.Plus style={{ width: 14, height: 14 }} /> Produk baru</button>
+        <div className="row" style={{ gap: 8 }}>
+          {isOffset && <button className={`btn ${showTpl ? 'btn-secondary' : 'btn-ghost'}`} onClick={() => setShowTpl(!showTpl)} aria-expanded={showTpl}>Dari template</button>}
+          <button className="btn btn-primary" onClick={onNew}><Icon.Plus style={{ width: 14, height: 14 }} /> Produk baru</button>
+        </div>
       </div>
+
+      {isOffset && showTpl && (
+        <div className="card" style={{ marginBottom: 18 }}>
+          <div className="row-between" style={{ marginBottom: 12 }}>
+            <div>
+              <div className="section-eyebrow">Template order</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 4 }}>Contoh order yang sudah diisi. Pilih satu, lalu ubah angkanya sesuai pesanan.</div>
+            </div>
+            <button className="btn btn-ghost btn-icon" aria-label="Tutup template" onClick={() => setShowTpl(false)}><Icon.X style={{ width: 14, height: 14 }} /></button>
+          </div>
+          <div className="tpl-grid">
+            {OFFSET_TEMPLATES.map((t) => {
+              const r = calcOffset(productFromTemplate(t, master), master);
+              return (
+                <button key={t.id} className="tpl-card" onClick={() => { setShowTpl(false); onFromTemplate(t); }}>
+                  <span className="tpl-name">{t.name}</span>
+                  <span className="tpl-desc">{t.desc}</span>
+                  <span className="tpl-foot">
+                    <span className="row" style={{ gap: 4, flexWrap: 'wrap' }}>{t.tags.map((g) => <span key={g} className="tag tag-neutral">{g}</span>)}</span>
+                    <span className="mono" style={{ fontSize: 12.5, whiteSpace: 'nowrap' }}>{fmtRp(r.perPcs)}/pcs</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari produk…" aria-label="Cari produk" style={{ marginBottom: 18 }} />
 

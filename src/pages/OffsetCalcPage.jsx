@@ -5,10 +5,8 @@ import { CostCard, Check, MediaLayout, NegoCard, NumField, Select, SummaryBar, W
 import { FinishingList, OthersCard } from '../components/editors.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
-import { calcOffset, calcOffsetMedia } from '../lib/engine.js';
+import { calcOffset, calcOffsetMedia, mediaCostOf } from '../lib/engine.js';
 import { newId } from '../lib/masterData.js';
-
-const mediaCostOf = (r) => r.paperCost + (r.print?.cost || 0) + r.finItems.reduce((s, f) => s + f.cost, 0) + (r.cutting?.cost || 0);
 
 export function newOffsetMedia(master) {
   return {
@@ -73,11 +71,13 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                 )}
               </div>
               <div className="stack">
-                  <div className="grid-4">
+                  <div className="grid-auto">
                     <Select label="Kertas" value={m.paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
                       options={master.papers.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
                     <NumField label="Lembar per pcs" suffix="×" value={m.perPcs} onChange={(v) => setMedia(m.id, { perPcs: v })}
                       hint="Kalender 13 lembar = 13" />
+                    <NumField label="Desain berbeda" suffix="desain" value={m.designs || 1} onChange={(v) => setMedia(m.id, { designs: v })}
+                      hint="Tiap bulan beda = 13. Sama semua = 1" />
                     <NumField label="Lebar hasil jadi" suffix="cm" value={m.w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })} />
                     <NumField label="Tinggi hasil jadi" suffix="cm" value={m.h} onChange={(v) => setMedia(m.id, { h: v, layoutKey: null })} />
                   </div>

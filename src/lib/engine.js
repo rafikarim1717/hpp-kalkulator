@@ -83,9 +83,9 @@ export function finishingLimits(sheetW, sheetH, finishings, fset) {
   return problems;
 }
 
-// Pilihan otomatis ala app referensi: susunan paling banyak di area cetak;
-// kalau lembarnya kebesaran untuk salah satu finishing, turun ke 1 naik.
-function autoLayout(iw, ih, machine, finishings, fset) {
+// Mode "referensi" (sama dengan app Android): susunan paling banyak di area cetak;
+// kalau lembarnya kebesaran untuk salah satu finishing, langsung turun ke 1 naik.
+function referenceLayout(iw, ih, machine, finishings, fset) {
   const pw = num(machine.printW), ph = num(machine.printH);
   const best = calcImposition(pw, ph, iw, ih, 0, 0, 0, 0, 'best');
   let arr;
@@ -132,6 +132,7 @@ const atLeast = (min, v) => ({ cost: Math.max(num(min), v), hitMin: v < num(min)
 
 function calcFinishing(f, s, ctx) {
   const { w, h, pcs, printSheets, productQty } = ctx;
+  const up = Math.max(1, num(ctx.up) || 1); // alat yang menempel per naik (pisau, klise) dikali jumlah naik
   const area = w * h;
   const out = { type: f.type, label: label(f.type), parts: [], cost: 0, hitMin: false };
   const add = (note, r) => { out.parts.push({ note, cost: r.cost, hitMin: r.hitMin }); out.cost += r.cost; out.hitMin = out.hitMin || r.hitMin; };
@@ -159,7 +160,12 @@ function calcFinishing(f, s, ctx) {
       add(`${printSheets} lbr`, atLeast(s.min, printSheets * num(s.rate)));
       if (f.includeTemplate) {
         const t = (s.templates || []).find((x) => x.name === f.template) || (s.templates || [])[0];
-        if (t) add(`Pisau ${t.name} · keliling ${round2(2 * (w + h))} cm`, atLeast(t.min, 2 * (w + h) * num(t.rate)));
+        if (t) {
+          const manual = num(f.knifeLength) > 0;
+          const per = manual ? num(f.knifeLength) : 2 * (w + h);
+          const len = per * up;
+          add(`Pisau ${t.name} · ${round2(per)} cm${manual ? '' : ' (keliling)'}${up > 1 ? ` × ${up} naik` : ''}`, atLeast(t.min, len * num(t.rate)));
+        }
       }
       break;
     }
@@ -175,21 +181,21 @@ function calcFinishing(f, s, ctx) {
         let sum = 0, tpl = 0;
         for (const sp of spots) {
           const a = num(sp.w) * num(sp.h);
-          sum += Math.max(num(s.f2.minPerSpot), a * num(s.f2.rate) * printSheets);
-          if (!sp.templateAvailable && a > 0) tpl += Math.max(num(s.templateMin), a * num(s.templateRate));
+          sum += Math.max(num(s.f2.minPerSpot), a * num(s.f2.rate) * printSheets * up);
+          if (!sp.templateAvailable && a > 0) tpl += Math.max(num(s.templateMin), a * up * num(s.templateRate));
         }
-        add(`${spots.length} spot · ${sides} sisi`, atLeast(s.f2.min, sum * sides));
+        add(`${spots.length} spot × ${up} naik · ${sides} sisi`, atLeast(s.f2.min, sum * sides));
         if (tpl > 0) add('Template', { cost: tpl, hitMin: false });
       } else {
         const a = num(f.w) * num(f.h);
-        add(`${round2(num(f.w))} × ${round2(num(f.h))} · ${sides} sisi`, atLeast(s.f1.min, a * num(s.f1.rate) * printSheets * sides));
-        if (f.includeTemplate && a > 0) add('Template', atLeast(s.templateMin, a * num(s.templateRate)));
+        add(`${round2(num(f.w))} × ${round2(num(f.h))} × ${up} naik · ${sides} sisi`, atLeast(s.f1.min, a * up * num(s.f1.rate) * printSheets * sides));
+        if (f.includeTemplate && a > 0) add(`Klise × ${up}`, atLeast(s.templateMin, a * up * num(s.templateRate)));
       }
       break;
     }
     case 'emboss': {
       add(`${printSheets} lbr`, atLeast(s.min, printSheets * num(s.rate)));
-      if (f.includeTemplate) add('Template', atLeast(s.templateMin, area * num(s.templateRate)));
+      if (f.includeTemplate) add(`Klise × ${up}`, atLeast(s.templateMin, area * up * num(s.templateRate)));
       break;
     }
     case 'spiral': {
@@ -203,6 +209,37 @@ function calcFinishing(f, s, ctx) {
 }
 
 // ── Media offset ───────────────────────────────────────────────────────────
+
+// Bagi desain ke set plat. Satu lembar cetak isi `up` naik, jadi satu set plat bisa memuat
+// sampai `up` desain berbeda (ditumpuk). Contoh kalender 13 halaman, 4 naik → 4 set plat.
+// Tiap desain dicetak ceil(pcs / desain) kali; desain dalam satu set berbagi naik sama rata.
+export function plateSets(designs, up, pcs) {
+  const D = Math.max(1, designs), U = Math.max(1, up);
+  const n = Math.ceil(D / U);
+  const copies = pcs > 0 ? ceil(pcs / D) : 0;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const g = Math.floor(D / n) + (i < D % n ? 1 : 0);
+    const slots = Math.max(1, Math.floor(U / g));
+    out.push({ designs: g, slots, base: copies > 0 ? ceil(copies / slots) : 0 });
+  }
+  return out;
+}
+
+export const mediaCostOf = (r) => r.paperCost + (r.print?.cost || 0) + r.finItems.reduce((s, f) => s + f.cost, 0) + (r.cutting?.cost || 0);
+
+// Hitung tiap pilihan susunan yang muat semua finishing, ambil yang biayanya paling kecil
+// (seri → naik lebih banyak).
+function cheapestOption(options, media, product, master) {
+  let best = null, bestCost = Infinity;
+  for (const o of options) {
+    if (o.problems.length) continue;
+    const r = calcOffsetMedia({ ...media, layoutKey: o.key }, product, master);
+    const c = mediaCostOf(r);
+    if (c < bestCost - 0.5 || (Math.abs(c - bestCost) <= 0.5 && o.up > best.up)) { best = o; bestCost = c; }
+  }
+  return best;
+}
 
 export function calcOffsetMedia(media, product, master) {
   const paper = master.papers.find((p) => p.id === media.paperId);
@@ -221,7 +258,13 @@ export function calcOffsetMedia(media, product, master) {
   if (machine && iw > 0 && ih > 0) {
     options = layoutOptions(iw, ih, machine).map((o) => ({ ...o, problems: finishingLimits(o.sheetW, o.sheetH, finishings, fset) }));
     const picked = media.layoutKey && options.find((o) => o.key === media.layoutKey);
-    arr = picked || autoLayout(iw, ih, machine, finishings, fset);
+    if (picked) arr = picked;
+    else if (master.settings?.autoLayout === 'reference') arr = referenceLayout(iw, ih, machine, finishings, fset);
+    else {
+      // otomatis: susunan termurah yang masih muat di semua mesin finishing
+      const best = cheapestOption(options, media, product, master);
+      arr = best || referenceLayout(iw, ih, machine, finishings, fset);
+    }
     if (picked && picked.problems.length) warnings.push(`Lembar ${picked.sheetW} × ${picked.sheetH} terlalu besar untuk ${picked.problems.join(', ')}.`);
     if (iw > num(machine.printW) && iw > num(machine.printH)) warnings.push(`Ukuran ${w} × ${h} lebih besar dari area cetak ${machine.name}.`);
   } else {
@@ -230,11 +273,19 @@ export function calcOffsetMedia(media, product, master) {
   }
   const up = Math.max(1, arr.up || 0);
 
-  // 2. jumlah lembar
-  const baseSheets = pcs > 0 ? ceil(pcs / up) : 0;
-  const finInsheet = finishings.reduce((s, f) => s + finishingInsheet(f, fset[f.type], baseSheets), 0);
-  const printSheets = baseSheets > 0 ? baseSheets + finInsheet : 0;
-  const machineInsheet = machine && printSheets > 0 ? Math.max(num(machine.insheetMin), ceil(printSheets * num(machine.insheetPct) / 100)) : 0;
+  // 2. jumlah lembar, per set plat (desain berbeda → plat berbeda)
+  const designs = Math.max(1, Math.floor(num(media.designs)) || 1);
+  const sets = plateSets(designs, up, pcs).map((st) => {
+    const finIns = st.base > 0 ? finishings.reduce((s, f) => s + finishingInsheet(f, fset[f.type], st.base), 0) : 0;
+    const print = st.base > 0 ? st.base + finIns : 0;
+    const mIns = machine && print > 0 ? Math.max(num(machine.insheetMin), ceil(print * num(machine.insheetPct) / 100)) : 0;
+    return { ...st, finIns, print, mIns };
+  });
+  const sum = (k) => sets.reduce((s, x) => s + x[k], 0);
+  const baseSheets = sum('base');
+  const finInsheet = sum('finIns');
+  const printSheets = sum('print');
+  const machineInsheet = sum('mIns');
   const totalSheets = printSheets + machineInsheet;
 
   // 3. kertas
@@ -248,17 +299,19 @@ export function calcOffsetMedia(media, product, master) {
     const m = media.machine;
     const front = num(m.front), back = m.twoSides ? num(m.back) : 0, special = num(m.special);
     const same = m.twoSides && m.samePlate && back === front;
-    const plates = same ? front + special : front + back + special;
+    const platesPerSet = same ? front + special : front + back + special;
+    const plates = platesPerSet * sets.length;
     const plateCost = plates * num(machine.platePrice);
     const minCost = plates * (same ? num(machine.costMinSame) : num(machine.costMin));
-    const extraSheets = Math.max(0, printSheets - num(machine.minSheets));
+    // ongkos minimum berlaku per set plat (tiap ganti plat mulai hitungan baru)
+    const extraSheets = sets.reduce((s, st) => s + Math.max(0, st.print - num(machine.minSheets)), 0);
     const colorSides = front + back + special;
     const extraCost = extraSheets * num(machine.costPerSheet) * colorSides;
-    print = { plates, plateCost, minCost, extraSheets, extraCost, cost: plateCost + minCost + extraCost, hitMin: extraSheets === 0, same };
+    print = { plates, platesPerSet, sets: sets.length, plateCost, minCost, extraSheets, extraCost, cost: plateCost + minCost + extraCost, hitMin: extraSheets === 0, same };
   }
 
   // 5. finishing + potong otomatis
-  const ctx = { w, h, pcs, printSheets, productQty: num(product.qty) };
+  const ctx = { w, h, pcs, printSheets, up, productQty: num(product.qty) };
   const finItems = finishings.map((f) => calcFinishing(f, fset[f.type], ctx));
   const lam = finishings.find((f) => f.type === 'laminating');
   const lb = lam ? num(fset.laminating?.bleed) : 0;
@@ -274,7 +327,7 @@ export function calcOffsetMedia(media, product, master) {
   const weightKg = pcs * w * h * gsm / 1e7;
 
   return {
-    id: media.id, paper, machine, pcs, w, h, iw, ih, up, layout: arr, options,
+    id: media.id, paper, machine, pcs, w, h, iw, ih, up, layout: arr, options, designs, sets,
     baseSheets, finInsheet, printSheets, machineInsheet, totalSheets,
     plano, paperCost, print, finItems, cutting, weightKg, warnings,
   };
@@ -340,7 +393,7 @@ export function calcOffset(product, master) {
   media.forEach((m, i) => {
     const tag = product.media.length > 1 ? ` · media ${i + 1}` : '';
     if (m.paper && m.plano) lines.push({ group: 'media', label: `Kertas${tag}`, note: `${m.paper.name} · ${m.plano.planos} plano · ${m.totalSheets} lbr`, cost: m.paperCost, hitMin: false });
-    if (m.print) lines.push({ group: 'print', label: `Cetak · ${m.machine.name}${tag}`, note: `${m.print.plates} plat · ${m.printSheets} lbr`, cost: m.print.cost, hitMin: m.print.hitMin });
+    if (m.print) lines.push({ group: 'print', label: `Cetak · ${m.machine.name}${tag}`, note: m.print.sets > 1 ? `${m.print.sets} set × ${m.print.platesPerSet} plat = ${m.print.plates} plat · ${m.printSheets} lbr` : `${m.print.plates} plat · ${m.printSheets} lbr`, cost: m.print.cost, hitMin: m.print.hitMin });
     m.finItems.forEach((f) => lines.push({ group: 'finishing', label: `${f.label}${tag}`, note: f.parts.map((p) => p.note).join(' · '), cost: f.cost, hitMin: f.hitMin }));
     if (m.cutting) lines.push({ group: 'finishing', label: `Potong${tag}`, note: `${m.cutting.kg} kg`, cost: m.cutting.cost, hitMin: m.cutting.hitMin });
   });

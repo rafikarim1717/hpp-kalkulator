@@ -103,7 +103,8 @@ export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
       </div>
       <div className="layout-stats">
         <div className="stat-card"><div className="stat-label">Lembar cetak</div><div className="stat-value" style={{ fontSize: 22 }}>{fmtNum(m.totalSheets)}</div>
-          <div className="stat-sub">{fmtNum(m.baseSheets)} + {fmtNum(m.finInsheet)} finishing{hasMachine ? ` + ${fmtNum(m.machineInsheet)} mesin` : ''}</div></div>
+          <div className="stat-sub">{fmtNum(m.baseSheets)} + {fmtNum(m.finInsheet)} finishing{hasMachine ? ` + ${fmtNum(m.machineInsheet)} mesin` : ''}</div>
+          {m.sets?.length > 1 && <div className="stat-sub" style={{ marginTop: 4 }}>{m.designs} desain → {m.sets.length} set plat</div>}</div>
         <div className="stat-card"><div className="stat-label">Plano dibeli</div><div className="stat-value" style={{ fontSize: 22 }}>{m.plano ? fmtNum(m.plano.planos) : '–'}</div>
           <div className="stat-sub">{m.plano ? `${cm(m.plano.w)} × ${cm(m.plano.h)} · ${fmtRp(m.paperCost)}` : ''}</div></div>
         <div className="stat-card"><div className="stat-label">Efisiensi plano</div><div className="stat-value" style={{ fontSize: 22 }}>{m.plano ? `${fmtNum(m.plano.eff, 1)}%` : '–'}</div>

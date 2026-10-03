@@ -9,6 +9,9 @@ export const DEFAULT_SETTINGS = {
   profitPct: 50,
   profitMin: 300000, // profit minimum per order
   taxPct: 10,
+  // pilihan susunan otomatis: 'cheapest' = termurah yang muat semua finishing,
+  // 'reference' = sama dengan app Android (naik maksimal, kalau kebesaran langsung 1 naik)
+  autoLayout: 'cheapest',
   // komponen mana yang kena profit / pajak
   profitOn: { media: true, print: true, finishing: true, other: true },
   taxOn: { media: true, print: true, finishing: true, other: true },
