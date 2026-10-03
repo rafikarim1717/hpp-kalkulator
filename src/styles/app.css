@@ -888,5 +888,5 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--sans); }
 /* HP: topbar jangan melebar keluar layar */
 @media (max-width: 640px) {
   .topbar { min-width: 0; gap: 8px; }
-  .brand-version, .topbar .btn-tampilan { display: none; }
+  .brand-version { display: none; }
 }
