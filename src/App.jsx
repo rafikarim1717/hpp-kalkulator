@@ -5,14 +5,15 @@ import Login from './components/Login.jsx';
 import { TweakRadio, TweakSection, TweakSlider, TweaksPanel, useTweaks } from './components/TweaksPanel.jsx';
 import { useLocalState } from './hooks/useLocalState.js';
 import {
-  DEFAULT_HPP_STATE, DEFAULT_MATERIALS, DEFAULT_PLANO_STATE, DEFAULT_TOOLS,
-  normalizeHppState, normalizeMaterial, normalizePlanoState, normalizeTool,
-} from './lib/constants.js';
-import HistoryPage from './pages/HistoryPage.jsx';
-import HppPage from './pages/HppPage.jsx';
-import MaterialsPage from './pages/MaterialsPage.jsx';
-import PlanoPage from './pages/PlanoPage.jsx';
-import ToolsPage from './pages/ToolsPage.jsx';
+  DEFAULT_DIGITAL_MACHINES, DEFAULT_DIGITAL_PAPERS, DEFAULT_FINISHING, DEFAULT_MACHINES,
+  DEFAULT_OTHERS, DEFAULT_PAPERS, DEFAULT_SETTINGS, SAMPLE_BROSUR, newId,
+} from './lib/masterData.js';
+import DigitalCalcPage, { newDigitalItem } from './pages/DigitalCalcPage.jsx';
+import {
+  DigitalMasterPage, FinishingPage, MachinesPage, OthersPage, PapersPage, SettingsPage,
+} from './pages/MasterPages.jsx';
+import OffsetCalcPage, { newOffsetMedia } from './pages/OffsetCalcPage.jsx';
+import ProductsPage from './pages/ProductsPage.jsx';
 
 const TWEAK_DEFAULTS = {
   theme: 'warm',
@@ -22,22 +23,31 @@ const TWEAK_DEFAULTS = {
 };
 
 const NAV = [
-  { id: 'plano', label: 'Plano & Imposition', icon: Icon.Grid, group: 'Kalkulator' },
-  { id: 'hpp', label: 'Hitung HPP', icon: Icon.Calc, group: 'Kalkulator' },
-  { id: 'tools', label: 'Mesin', icon: Icon.Tool, group: 'Master Data' },
-  { id: 'materials', label: 'Material', icon: Icon.Paper, group: 'Master Data' },
-  { id: 'history', label: 'Histori', icon: Icon.Clock, group: 'Riwayat' },
+  { id: 'offset', label: 'Offset Printing', icon: Icon.Calc, group: 'Kalkulator' },
+  { id: 'digital', label: 'Digital Printing', icon: Icon.Grid, group: 'Kalkulator' },
+  { id: 'paper', label: 'Kertas', icon: Icon.Paper, group: 'Data Master' },
+  { id: 'machine', label: 'Mesin', icon: Icon.Tool, group: 'Data Master' },
+  { id: 'finishing', label: 'Finishing', icon: Icon.Edit, group: 'Data Master' },
+  { id: 'other', label: 'Biaya lain', icon: Icon.Plus, group: 'Data Master' },
+  { id: 'digital-master', label: 'Digital', icon: Icon.Grid, group: 'Data Master' },
+  { id: 'settings', label: 'Profit & pajak', icon: Icon.Clock, group: 'Pengaturan' },
 ];
 
 const App = () => {
   const [user, setUser] = useLocalState('pl_user', null);
-  const [page, setPage] = useLocalState('pl_page', 'plano');
-  const [tools, setTools] = useLocalState('pl_tools', DEFAULT_TOOLS, (list) => list.map(normalizeTool));
-  const [materials, setMaterials] = useLocalState('pl_materials', DEFAULT_MATERIALS, (list) => list.map(normalizeMaterial));
-  const [history, setHistory] = useLocalState('pl_history', []);
-  const [planoState, setPlanoState] = useLocalState('pl_plano', DEFAULT_PLANO_STATE, normalizePlanoState);
-  const [hppState, setHppState] = useLocalState('pl_hpp', DEFAULT_HPP_STATE(), normalizeHppState);
-  const [fromPlano, setFromPlano] = React.useState(null);
+  const [page, setPage] = useLocalState('pl2_page', 'offset');
+  const [openId, setOpenId] = useLocalState('pl2_open', null);
+  const [settings, setSettings] = useLocalState('pl2_settings', DEFAULT_SETTINGS);
+  const [papers, setPapers] = useLocalState('pl2_papers', DEFAULT_PAPERS);
+  const [machines, setMachines] = useLocalState('pl2_machines', DEFAULT_MACHINES);
+  const [finishing, setFinishing] = useLocalState('pl2_finishing', DEFAULT_FINISHING, (f) => ({ ...DEFAULT_FINISHING, ...f }));
+  const [others, setOthers] = useLocalState('pl2_others', DEFAULT_OTHERS);
+  const [digitalPapers, setDigitalPapers] = useLocalState('pl2_dpapers', DEFAULT_DIGITAL_PAPERS);
+  const [digitalMachines, setDigitalMachines] = useLocalState('pl2_dmachines', DEFAULT_DIGITAL_MACHINES);
+  const [products, setProducts] = useLocalState('pl2_products', [SAMPLE_BROSUR]);
+  const master = React.useMemo(() => ({
+    settings, papers, machines, finishing, others, digitalPapers, digitalMachines,
+  }), [settings, papers, machines, finishing, others, digitalPapers, digitalMachines]);
   const [mobileNav, setMobileNav] = React.useState(false);
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
 
@@ -48,7 +58,7 @@ const App = () => {
   React.useEffect(() => {
     window.scrollTo(0, 0);
     if (mainRef.current) mainRef.current.scrollTop = 0;
-  }, [page]);
+  }, [page, openId]);
 
   // Apply tweaks to body
   React.useEffect(() => {
@@ -72,53 +82,41 @@ const App = () => {
     {tweaksPanel}
   </>;
 
-  // Kirim hasil layout ke satu komponen di Hitung HPP
-  const sendToHpp = (layout, componentId) => {
-    const { machineId, ...rest } = layout;
-    const targetId = componentId || hppState.activeComponentId;
-    const target = hppState.components.find((c) => c.id === targetId) || hppState.components[0];
-    const patch = { ...rest };
-    // ikut pilih mesin kalau di Plano dicek dan komponen ini belum punya mesin
-    const t = tools.find((x) => String(x.id) === String(machineId));
-    if (t && !target.machineId) {
-      Object.assign(patch, { machineId, maxColor: t.maxcolor, runRate: t.runrate, platePrice: t.plate, minRun: t.minorder, setupSheets: t.setup ?? target.setupSheets });
-    }
-    setFromPlano({ ...layout, componentName: target.name, acked: false });
-    setHppState({
-      ...hppState,
-      components: hppState.components.map((c) => (c.id === target.id ? { ...c, ...patch } : c)),
-      activeComponentId: target.id,
-    });
-    setPage('hpp');
+  const openProduct = products.find((p) => p.id === openId);
+  const setProduct = (next) => setProducts(products.map((p) => (p.id === next.id ? next : p)));
+  const newProduct = (kind) => {
+    const p = kind === 'offset'
+      ? { id: newId('p'), kind, name: '', qty: 1000, media: [newOffsetMedia(master)], others: [] }
+      : { id: newId('p'), kind, name: '', qty: 100, items: [newDigitalItem(master)], others: [] };
+    setProducts([...products, p]);
+    setOpenId(p.id);
   };
-  const ackFromPlano = () => setFromPlano(null);
-
-  const saveCalc = (s, result) => {
-    const entry = {
-      id: Date.now(), date: new Date().toISOString(),
-      name: s.name, qty: s.qty,
-      sub: result.sub, perPcs: result.perPcs, sell: result.sell, sellPer: result.sellPer,
-      sellIncl: result.sellIncl,
-      components: s.components.map((c) => c.name),
-      input: s, // snapshot lengkap supaya bisa dibuka lagi
-    };
-    setHistory([...history, entry]);
+  const duplicate = (id) => {
+    const src = products.find((p) => p.id === id);
+    if (!src) return;
+    const copy = { ...JSON.parse(JSON.stringify(src)), id: newId('p'), name: `${src.name || 'Produk'} (salinan)` };
+    setProducts([...products, copy]);
+    setOpenId(copy.id);
   };
-
-  const openFromHistory = (entry) => {
-    setHppState(normalizeHppState(entry.input));
-    setFromPlano(null);
-    setPage('hpp');
-  };
+  const remove = (id) => { setProducts(products.filter((p) => p.id !== id)); if (openId === id) setOpenId(null); };
 
   const renderPage = () => {
     switch (page) {
-      case 'plano': return <PlanoPage planoState={planoState} setPlanoState={setPlanoState} tools={tools}
-        components={hppState.components} activeComponentId={hppState.activeComponentId} onSendToHpp={sendToHpp} />;
-      case 'hpp': return <HppPage hppState={hppState} setHppState={setHppState} tools={tools} materials={materials} onSave={saveCalc} fromPlano={fromPlano} ackFromPlano={ackFromPlano} />;
-      case 'tools': return <ToolsPage tools={tools} setTools={setTools} />;
-      case 'materials': return <MaterialsPage materials={materials} setMaterials={setMaterials} />;
-      case 'history': return <HistoryPage history={history} setHistory={setHistory} onOpen={openFromHistory} />;
+      case 'offset': case 'digital': {
+        if (openProduct && openProduct.kind === page) {
+          const Calc = page === 'offset' ? OffsetCalcPage : DigitalCalcPage;
+          return <Calc key={openProduct.id} product={openProduct} setProduct={setProduct} master={master}
+            onBack={() => setOpenId(null)} onDuplicate={() => duplicate(openProduct.id)} />;
+        }
+        return <ProductsPage kind={page} products={products} master={master} onOpen={setOpenId}
+          onNew={() => newProduct(page)} onDuplicate={duplicate} onDelete={remove} />;
+      }
+      case 'paper': return <PapersPage papers={papers} setPapers={setPapers} />;
+      case 'machine': return <MachinesPage machines={machines} setMachines={setMachines} />;
+      case 'finishing': return <FinishingPage finishing={finishing} setFinishing={setFinishing} />;
+      case 'other': return <OthersPage others={others} setOthers={setOthers} />;
+      case 'digital-master': return <DigitalMasterPage papers={digitalPapers} setPapers={setDigitalPapers} machines={digitalMachines} setMachines={setDigitalMachines} />;
+      case 'settings': return <SettingsPage settings={settings} setSettings={setSettings} />;
       default: return null;
     }
   };
@@ -135,7 +133,7 @@ const App = () => {
         <div className="brand">
           <div className="brand-mark">P</div>
           <div className="brand-name">Pricelab</div>
-          <div className="brand-version">v2.0</div>
+          <div className="brand-version">v3 beta</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <button className="btn btn-ghost btn-sm" onClick={() => setTweaksOpen(!tweaksOpen)} title="Pengaturan tampilan">
@@ -158,7 +156,7 @@ const App = () => {
               const I = n.icon;
               return (
                 <div key={n.id} className={`nav-item ${page === n.id ? 'active' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); setPage(n.id); setMobileNav(false); }}>
+                  onClick={(e) => { e.stopPropagation(); setPage(n.id); setOpenId(null); setMobileNav(false); }}>
                   <I className="nav-icon" />
                   <span>{n.label}</span>
                 </div>
@@ -167,7 +165,7 @@ const App = () => {
           </div>
         ))}
         <div style={{ marginTop: 'auto', padding: '12px 10px', fontSize: 11, color: 'var(--text-4)', fontFamily: 'var(--mono)' }}>
-          v2.0 · Pricelab
+          v3 beta · Pricelab
         </div>
       </div>
 

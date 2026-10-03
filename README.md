@@ -16,6 +16,19 @@ npm test          # unit test rumus (Vitest)
 
 Login demo: `demo` / `demo123` (cuma cek di sisi browser, bukan autentikasi beneran).
 
+## v3 (branch `v2`) — logika ala app referensi
+
+Kalkulasi baru mengikuti cara hitung app Android "Kalkulator Biaya Cetak Pro" yang dipakai client,
+ditambah preview layout (plano → lembar cetak → susunan naik) yang tidak ada di app itu.
+
+- `src/lib/engine.js` — rumus offset & digital (lembar cetak, plano termurah, insheet, plat, finishing, biaya lain, profit minimum, pajak)
+- `src/lib/engine.test.js` — angka Brosur & Undangan dari app referensi dikunci di sini (Brosur 100 pcs = Rp 945.836; app lama Rp 948.636 karena bug pajak plastik)
+- `src/lib/masterData.js` — data master default (setting client: Gto 52, Art Carton 190, 9 finishing, 5 biaya lain)
+- `src/pages/` — `ProductsPage`, `OffsetCalcPage`, `DigitalCalcPage`, `MasterPages` (Kertas, Mesin, Finishing, Biaya lain, Digital, Profit & pajak)
+- Halaman lama (`PlanoPage`, `HppPage`, `ToolsPage`, `MaterialsPage`, `HistoryPage`) tidak dipakai lagi di navigasi; bisa dihapus setelah v3 di-approve.
+
+Key localStorage v3: `pl2_*` (data v2 lama `pl_*` tidak disentuh).
+
 ## Struktur
 
 ```
