@@ -1,6 +1,7 @@
-// Kalkulasi produk offset: isian di kiri; total, layout, rincian, nego di kanan.
+// Kalkulasi produk offset: ringkasan harga di atas, tiap media = isian + layout besar berdampingan,
+// lalu biaya lain + rincian + nego.
 import React from 'react';
-import { CostCard, Check, LayoutCard, NegoCard, NumField, Select, TotalCard, Warnings } from '../components/calcParts.jsx';
+import { CostCard, Check, MediaLayout, NegoCard, NumField, Select, SummaryBar, Warnings } from '../components/calcParts.jsx';
 import { FinishingList, OthersCard } from '../components/editors.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
@@ -42,41 +43,42 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
           <button className="btn btn-ghost btn-sm" style={{ marginLeft: -12, marginBottom: 6 }} onClick={onBack}>← Offset Printing</button>
           <h1 className="page-title">{product.name || 'Produk tanpa nama'}</h1>
         </div>
-        <div className="row">
-          <button className="btn btn-secondary" onClick={onDuplicate}>Duplikat</button>
-        </div>
+        <button className="btn btn-secondary" onClick={onDuplicate}>Duplikat</button>
       </div>
 
-      <div className="calc-ws">
-        <div className="stack">
-          <div className="card">
-            <div className="section-eyebrow" style={{ marginBottom: 12 }}>Produk</div>
-            <div className="grid-2">
-              <Field label="Nama produk"><input type="text" value={product.name} onChange={(e) => set({ name: e.target.value })} placeholder="mis. Brosur A5" /></Field>
-              <NumField label="Jumlah" suffix="pcs" value={product.qty} onChange={(v) => set({ qty: v })} />
-            </div>
-          </div>
+      <div className="stack">
+        <SummaryBar result={result} qty={product.qty} />
+        <Warnings list={warnings} />
 
-          {product.media.map((m, i) => {
-            const r = result.media[i];
-            return (
-              <div key={m.id} className="card">
-                <div className="row-between" style={{ marginBottom: 12 }}>
-                  <div className="section-eyebrow">Media {i + 1}</div>
-                  {product.media.length > 1 && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => set({ media: product.media.filter((x) => x.id !== m.id) })}>
-                      <Icon.Trash style={{ width: 13, height: 13 }} /> Hapus media
-                    </button>
-                  )}
-                </div>
+        <div className="card">
+          <div className="section-eyebrow" style={{ marginBottom: 12 }}>Produk</div>
+          <div className="grid-2">
+            <Field label="Nama produk"><input type="text" value={product.name} onChange={(e) => set({ name: e.target.value })} placeholder="mis. Brosur A5" /></Field>
+            <NumField label="Jumlah" suffix="pcs" value={product.qty} onChange={(v) => set({ qty: v })} />
+          </div>
+        </div>
+
+        {product.media.map((m, i) => {
+          const r = result.media[i];
+          return (
+            <section key={m.id} className="card media-card" aria-label={`Media ${i + 1}`}>
+              <div className="row-between" style={{ marginBottom: 14 }}>
+                <div className="section-eyebrow">Media {i + 1}{r?.paper ? ` · ${r.paper.name}` : ''}</div>
+                {product.media.length > 1 && (
+                  <button className="btn btn-ghost btn-sm" onClick={() => set({ media: product.media.filter((x) => x.id !== m.id) })}>
+                    <Icon.Trash style={{ width: 13, height: 13 }} /> Hapus media
+                  </button>
+                )}
+              </div>
+              <div className="media-split">
                 <div className="stack">
-                  <div className="grid-4">
+                  <div className="grid-2">
                     <Select label="Kertas" value={m.paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
                       options={master.papers.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
-                    <NumField label="Lebar" suffix="cm" value={m.w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })} />
-                    <NumField label="Tinggi" suffix="cm" value={m.h} onChange={(v) => setMedia(m.id, { h: v, layoutKey: null })} />
                     <NumField label="Lembar per pcs" suffix="×" value={m.perPcs} onChange={(v) => setMedia(m.id, { perPcs: v })}
                       hint="Kalender 13 lembar = 13" />
+                    <NumField label="Lebar hasil jadi" suffix="cm" value={m.w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })} />
+                    <NumField label="Tinggi hasil jadi" suffix="cm" value={m.h} onChange={(v) => setMedia(m.id, { h: v, layoutKey: null })} />
                   </div>
 
                   <div className="sub-card">
@@ -89,7 +91,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                     </div>
                     {m.machine && (
                       <div className="stack" style={{ gap: 10 }}>
-                        <div className="grid-4">
+                        <div className="grid-2">
                           <Select label="Mesin" value={m.machine.machineId} onChange={(v) => setMachine(m, { machineId: v })}
                             options={master.machines.map((x) => ({ value: x.id, label: x.name }))} />
                           <NumField label="Warna depan" value={m.machine.front} onChange={(v) => setMachine(m, { front: v })} />
@@ -111,25 +113,24 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                     costs={r?.finItems.map((f) => f.cost)}
                     onChange={(finishings) => setMedia(m.id, { finishings })} />
                 </div>
+
+                <MediaLayout m={r} input={m} opts={optionCosts(i)} onPick={(key) => setMedia(m.id, { layoutKey: key })} />
               </div>
-            );
-          })}
+            </section>
+          );
+        })}
 
-          <button className="btn btn-secondary" style={{ borderStyle: 'dashed' }}
-            onClick={() => set({ media: [...product.media, newOffsetMedia(master)] })}>
-            <Icon.Plus style={{ width: 14, height: 14 }} /> Tambah media (mis. amplop, cover)
-          </button>
+        <button className="btn btn-secondary" style={{ borderStyle: 'dashed' }}
+          onClick={() => set({ media: [...product.media, newOffsetMedia(master)] })}>
+          <Icon.Plus style={{ width: 14, height: 14 }} /> Tambah media (mis. amplop, cover)
+        </button>
 
+        <div className="cost-split">
           <OthersCard items={product.others} defs={master.others} costs={otherCosts} onChange={(others) => set({ others })} />
-        </div>
-
-        <div className="calc-side stack">
-          <TotalCard result={result} qty={product.qty} />
-          <Warnings list={warnings} />
-          <LayoutCard results={result.media} mediaInputs={product.media} optionCosts={optionCosts}
-            onPickLayout={(i, key) => setMedia(product.media[i].id, { layoutKey: key })} />
-          <CostCard result={result} settings={master.settings} />
-          <NegoCard result={result} qty={product.qty} />
+          <div className="stack">
+            <CostCard result={result} settings={master.settings} />
+            <NegoCard result={result} qty={product.qty} />
+          </div>
         </div>
       </div>
     </div>

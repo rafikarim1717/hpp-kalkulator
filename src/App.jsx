@@ -30,7 +30,7 @@ const NAV = [
   { id: 'finishing', label: 'Finishing', icon: Icon.Edit, group: 'Data Master' },
   { id: 'other', label: 'Biaya lain', icon: Icon.Plus, group: 'Data Master' },
   { id: 'digital-master', label: 'Digital', icon: Icon.Grid, group: 'Data Master' },
-  { id: 'settings', label: 'Profit & pajak', icon: Icon.Clock, group: 'Pengaturan' },
+  { id: 'settings', label: 'Pengaturan umum', icon: Icon.Clock, group: 'Pengaturan' },
 ];
 
 const App = () => {

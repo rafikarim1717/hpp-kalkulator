@@ -264,7 +264,7 @@ export const SettingsPage = ({ settings, setSettings }) => {
   const set = (patch) => setSettings({ ...settings, ...patch });
   return (
     <div className="page-fade">
-      <Header title="Profit" em="& pajak" sub="Berlaku untuk semua kalkulasi offset dan digital." />
+      <Header title="Pengaturan" em="umum" sub="Profit, pajak, dan bleed. Berlaku untuk semua kalkulasi offset dan digital. Satuan cm, mata uang Rupiah." />
       <div className="stack" style={{ maxWidth: 760 }}>
         <div className="card">
           <div className="grid-4">

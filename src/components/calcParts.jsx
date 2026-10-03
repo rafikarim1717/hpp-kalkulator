@@ -61,71 +61,73 @@ const SheetSvg = ({ w, h, blocks, offsetX = 0, offsetY = 0, grip = 0, maxH = 260
   );
 };
 
-// Kartu Layout: plano → lembar cetak → susunan naik, plus pilihan susunan.
-export const LayoutCard = ({ results, mediaInputs, onPickLayout, optionCosts }) => {
-  const [idx, setIdx] = React.useState(0);
-  const i = Math.min(idx, results.length - 1);
-  const m = results[i];
+// Panel layout untuk satu media: plano → lembar cetak → susunan naik, plus pilihan susunan.
+export const MediaLayout = ({ m, input, opts, onPick }) => {
   if (!m) return null;
-  const input = mediaInputs[i];
   const hasMachine = !!m.machine;
-  const opts = optionCosts ? optionCosts(i) : [];
   const cheapest = opts.length ? Math.min(...opts.map((o) => o.cost)) : null;
+  if (!(m.w > 0 && m.h > 0)) return <div className="layout-panel"><div className="hint-box">Isi ukuran hasil jadi untuk melihat layout.</div></div>;
   return (
-    <div className="card">
-      <div className="row-between" style={{ marginBottom: 12 }}>
-        <div style={{ fontFamily: 'var(--serif)', fontSize: 18 }}>Layout</div>
-        {results.length > 1 && (
-          <div className="seg" style={{ flex: 'none' }}>
-            {results.map((_, k) => <div key={k} className={`seg-btn ${k === i ? 'active' : ''}`} onClick={() => setIdx(k)}>Media {k + 1}</div>)}
-          </div>
-        )}
+    <div className="layout-panel">
+      <div className="row-between" style={{ marginBottom: 14 }}>
+        <div style={{ fontFamily: 'var(--serif)', fontSize: 20 }}>Layout</div>
+        {m.plano && <span className="tag tag-accent">1 plano = {m.plano.ratio} lembar · {m.up} naik</span>}
       </div>
-      {!(m.w > 0 && m.h > 0) ? (
-        <div className="hint-box">Isi ukuran hasil jadi dulu.</div>
-      ) : (
-        <>
-          <div className="layout-figs">
-            {m.plano && (
-              <SheetSvg w={m.plano.w} h={m.plano.h} blocks={m.plano.blocks}
-                label={`Plano ${cm(m.plano.w)} × ${cm(m.plano.h)} → ${m.plano.ratio} lembar`} />
-            )}
-            <SheetSvg w={m.layout.sheetW} h={m.layout.sheetH} blocks={m.layout.blocks}
-              offsetX={m.layout.offsetX} offsetY={m.layout.offsetY}
-              grip={hasMachine ? Number(m.machine.marginGrip) || 0 : 0} maxH={200}
-              label={`Lembar ${cm(m.layout.sheetW)} × ${cm(m.layout.sheetH)} → ${m.up} naik`} />
-          </div>
-          <div className="legend">
-            <span><i style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)' }} />Tegak</span>
-            <span><i style={{ background: 'color-mix(in oklch, var(--warn) 22%, var(--surface))', borderColor: 'oklch(0.55 0.14 60)' }} />Miring</span>
-            {hasMachine && <span><i className="grip-swatch" />Gripper</span>}
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <Row label="Lembar cetak" val={`${fmtNum(m.baseSheets)} + ${fmtNum(m.finInsheet)} insheet finishing`} />
-            {hasMachine && <Row label="Insheet mesin" val={`+ ${fmtNum(m.machineInsheet)}`} />}
-            <Row label="Total lembar" val={fmtNum(m.totalSheets)} strong />
-            {m.plano && <Row label="Plano dibeli" val={`${fmtNum(m.plano.planos)} · efisiensi ${fmtNum(m.plano.eff, 1)}%`} />}
-          </div>
-          {hasMachine && opts.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <Field label="Susunan di lembar cetak">
-                <select value={input.layoutKey || ''} onChange={(e) => onPickLayout(i, e.target.value || null)}>
-                  <option value="">Otomatis (seperti app lama)</option>
-                  {opts.map((o) => (
-                    <option key={o.key} value={o.key}>
-                      {o.up} naik · {cm(o.sheetW)} × {cm(o.sheetH)} · {fmtRp(o.cost)}{o.cost === cheapest ? ' · termurah' : ''}{o.problems.length ? ' · ⚠ finishing' : ''}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <div className="field-hint" style={{ marginTop: 6 }}>Harga di pilihan = kertas + cetak + finishing media ini.</div>
-            </div>
-          )}
-        </>
+      <div className="layout-figs">
+        {m.plano ? (
+          <SheetSvg w={m.plano.w} h={m.plano.h} blocks={m.plano.blocks} maxH={420}
+            label={`1 · Plano ${cm(m.plano.w)} × ${cm(m.plano.h)} dipotong jadi ${m.plano.ratio} lembar`} />
+        ) : <div className="hint-box">Pilih kertas yang punya ukuran plano.</div>}
+        <SheetSvg w={m.layout.sheetW} h={m.layout.sheetH} blocks={m.layout.blocks}
+          offsetX={m.layout.offsetX} offsetY={m.layout.offsetY}
+          grip={hasMachine ? Number(m.machine.marginGrip) || 0 : 0} maxH={320}
+          label={`2 · Lembar cetak ${cm(m.layout.sheetW)} × ${cm(m.layout.sheetH)} isi ${m.up} naik`} />
+      </div>
+      <div className="legend">
+        <span><i style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)' }} />Tegak</span>
+        <span><i style={{ background: 'color-mix(in oklch, var(--warn) 22%, var(--surface))', borderColor: 'oklch(0.55 0.14 60)' }} />Miring</span>
+        {hasMachine && <span><i className="grip-swatch" />Gripper</span>}
+      </div>
+      <div className="layout-stats">
+        <div className="stat-card"><div className="stat-label">Lembar cetak</div><div className="stat-value" style={{ fontSize: 20 }}>{fmtNum(m.totalSheets)}</div>
+          <div className="stat-sub">{fmtNum(m.baseSheets)} + {fmtNum(m.finInsheet)} finishing{hasMachine ? ` + ${fmtNum(m.machineInsheet)} mesin` : ''}</div></div>
+        <div className="stat-card"><div className="stat-label">Plano dibeli</div><div className="stat-value" style={{ fontSize: 20 }}>{m.plano ? fmtNum(m.plano.planos) : '–'}</div>
+          <div className="stat-sub">{m.plano ? `${cm(m.plano.w)} × ${cm(m.plano.h)} cm` : ''}</div></div>
+        <div className="stat-card"><div className="stat-label">Efisiensi</div><div className="stat-value" style={{ fontSize: 20 }}>{m.plano ? `${fmtNum(m.plano.eff, 1)}%` : '–'}</div>
+          <div className="stat-sub">kertas plano terpakai</div></div>
+      </div>
+      {hasMachine && opts.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <Field label="Susunan di lembar cetak">
+            <select value={input.layoutKey || ''} onChange={(e) => onPick(e.target.value || null)}>
+              <option value="">Otomatis (seperti app lama)</option>
+              {opts.map((o) => (
+                <option key={o.key} value={o.key}>
+                  {o.up} naik · {cm(o.sheetW)} × {cm(o.sheetH)} · {fmtRp(o.cost)}{o.cost === cheapest ? ' · termurah' : ''}{o.problems.length ? ' · ⚠ finishing' : ''}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="field-hint" style={{ marginTop: 6 }}>Harga di pilihan = kertas + cetak + finishing media ini.</div>
+        </div>
       )}
     </div>
   );
 };
+
+// Ringkasan harga di atas halaman
+export const SummaryBar = ({ result, qty }) => (
+  <div className="summary-bar">
+    <div className="summary-main">
+      <div className="total-label">Harga jual · {fmtNum(qty)} pcs</div>
+      <div className="total-val">{fmtRp(result.total)}</div>
+      <div className="total-per">{fmtRp(result.perPcs)} / pcs</div>
+    </div>
+    <div className="summary-item"><span>Total biaya</span><b>{fmtRp(result.cost)}</b></div>
+    <div className="summary-item"><span>Profit</span><b>{fmtRp(result.profit)}</b></div>
+    <div className="summary-item"><span>Pajak</span><b>{fmtRp(result.tax)}</b></div>
+  </div>
+);
 
 const Row = ({ label, val, strong }) => (
   <div className="result-row" style={{ padding: '6px 0', fontSize: 13 }}>
