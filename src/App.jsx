@@ -142,7 +142,7 @@ const App = () => {
           <div className="brand-version">v3 beta</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setTweaksOpen(!tweaksOpen)} title="Pengaturan tampilan">
+          <button className="btn btn-ghost btn-sm btn-tampilan" onClick={() => setTweaksOpen(!tweaksOpen)} title="Pengaturan tampilan">
             Tampilan
           </button>
           <div className="mono" style={{ fontSize: 12, color: 'var(--text-3)', padding: '5px 10px', background: 'var(--surface-2)', borderRadius: 20 }}>
