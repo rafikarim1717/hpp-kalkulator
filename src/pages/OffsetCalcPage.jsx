@@ -1,4 +1,4 @@
-// Kalkulasi produk offset: ringkasan harga di atas, tiap media = isian + layout besar berdampingan,
+// Kalkulasi produk offset: ringkasan harga di atas, tiap media = kartu isian lalu section layout selebar halaman,
 // lalu biaya lain + rincian + nego.
 import React from 'react';
 import { CostCard, Check, MediaLayout, NegoCard, NumField, Select, SummaryBar, Warnings } from '../components/calcParts.jsx';
@@ -7,6 +7,8 @@ import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
 import { calcOffset, calcOffsetMedia } from '../lib/engine.js';
 import { newId } from '../lib/masterData.js';
+
+const mediaCostOf = (r) => r.paperCost + (r.print?.cost || 0) + r.finItems.reduce((s, f) => s + f.cost, 0) + (r.cutting?.cost || 0);
 
 export function newOffsetMedia(master) {
   return {
@@ -26,10 +28,9 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
   const optionCosts = (i) => {
     const r = result.media[i];
     if (!r?.options?.length) return [];
-    return [...r.options].sort((a, b) => b.up - a.up).slice(0, 12).map((o) => {
+    return r.options.map((o) => {
       const alt = calcOffsetMedia({ ...product.media[i], layoutKey: o.key }, product, master);
-      const cost = alt.paperCost + (alt.print?.cost || 0) + alt.finItems.reduce((s, f) => s + f.cost, 0) + (alt.cutting?.cost || 0);
-      return { ...o, cost };
+      return { ...o, cost: mediaCostOf(alt), plano: alt.plano?.ratio };
     });
   };
 
@@ -61,7 +62,8 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
         {product.media.map((m, i) => {
           const r = result.media[i];
           return (
-            <section key={m.id} className="card media-card" aria-label={`Media ${i + 1}`}>
+            <React.Fragment key={m.id}>
+            <section className="card media-card" aria-label={`Media ${i + 1}`}>
               <div className="row-between" style={{ marginBottom: 14 }}>
                 <div className="section-eyebrow">Media {i + 1}{r?.paper ? ` · ${r.paper.name}` : ''}</div>
                 {product.media.length > 1 && (
@@ -70,9 +72,8 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                   </button>
                 )}
               </div>
-              <div className="media-split">
-                <div className="stack">
-                  <div className="grid-2">
+              <div className="stack">
+                  <div className="grid-4">
                     <Select label="Kertas" value={m.paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
                       options={master.papers.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
                     <NumField label="Lembar per pcs" suffix="×" value={m.perPcs} onChange={(v) => setMedia(m.id, { perPcs: v })}
@@ -91,7 +92,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                     </div>
                     {m.machine && (
                       <div className="stack" style={{ gap: 10 }}>
-                        <div className="grid-2">
+                        <div className="grid-4">
                           <Select label="Mesin" value={m.machine.machineId} onChange={(v) => setMachine(m, { machineId: v })}
                             options={master.machines.map((x) => ({ value: x.id, label: x.name }))} />
                           <NumField label="Warna depan" value={m.machine.front} onChange={(v) => setMachine(m, { front: v })} />
@@ -112,11 +113,11 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                   <FinishingList items={m.finishings} fset={master.finishing}
                     costs={r?.finItems.map((f) => f.cost)}
                     onChange={(finishings) => setMedia(m.id, { finishings })} />
-                </div>
-
-                <MediaLayout m={r} input={m} opts={optionCosts(i)} onPick={(key) => setMedia(m.id, { layoutKey: key })} />
               </div>
             </section>
+            <MediaLayout m={r} index={i} input={m} opts={optionCosts(i)} mediaCost={r ? mediaCostOf(r) : 0}
+              onPick={(key) => setMedia(m.id, { layoutKey: key })} />
+            </React.Fragment>
           );
         })}
 

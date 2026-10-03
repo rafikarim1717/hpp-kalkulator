@@ -61,57 +61,81 @@ const SheetSvg = ({ w, h, blocks, offsetX = 0, offsetY = 0, grip = 0, maxH = 260
   );
 };
 
-// Panel layout untuk satu media: plano → lembar cetak → susunan naik, plus pilihan susunan.
-export const MediaLayout = ({ m, input, opts, onPick }) => {
+// Section layout untuk satu media (lebar penuh): plano → lembar cetak, angka, dan kartu pilihan susunan.
+export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
   if (!m) return null;
   const hasMachine = !!m.machine;
-  const cheapest = opts.length ? Math.min(...opts.map((o) => o.cost)) : null;
-  if (!(m.w > 0 && m.h > 0)) return <div className="layout-panel"><div className="hint-box">Isi ukuran hasil jadi untuk melihat layout.</div></div>;
+  const title = `Layout Media ${index + 1}`;
+  if (!(m.w > 0 && m.h > 0)) {
+    return <section className="card layout-section"><h2 className="layout-title">{title}</h2><div className="hint-box">Isi ukuran hasil jadi untuk melihat layout.</div></section>;
+  }
+  // kartu pilihan: satu per jumlah naik + ukuran lembar, ambil yang termurah, urut dari naik terkecil
+  const byKey = new Map();
+  for (const o of opts) {
+    const k = `${o.up}|${o.sheetW}x${o.sheetH}`;
+    if (!byKey.has(k) || o.cost < byKey.get(k).cost) byKey.set(k, o);
+  }
+  const cards = [...byKey.values()].sort((a, b) => a.up - b.up || a.cost - b.cost);
+  const cheapest = cards.length ? Math.min(...cards.filter((o) => !o.problems.length).map((o) => o.cost)) : null;
+  const isCurrent = (o) => o.up === m.up && o.sheetW === m.layout.sheetW && o.sheetH === m.layout.sheetH;
   return (
-    <div className="layout-panel">
-      <div className="row-between" style={{ marginBottom: 14 }}>
-        <div style={{ fontFamily: 'var(--serif)', fontSize: 20 }}>Layout</div>
-        {m.plano && <span className="tag tag-accent">1 plano = {m.plano.ratio} lembar · {m.up} naik</span>}
+    <section className="card layout-section" aria-label={title}>
+      <div className="row-between" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+        <h2 className="layout-title">{title}</h2>
+        <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+          {m.plano ? `Plano ${cm(m.plano.w)} × ${cm(m.plano.h)} cm → ${m.plano.ratio} lembar cetak ${cm(m.layout.sheetW)} × ${cm(m.layout.sheetH)} → ${m.up} naik` : `Lembar ${cm(m.layout.sheetW)} × ${cm(m.layout.sheetH)} → ${m.up} naik`}
+        </span>
       </div>
-      <div className="layout-figs">
+      <div className="layout-figs big">
         {m.plano ? (
-          <SheetSvg w={m.plano.w} h={m.plano.h} blocks={m.plano.blocks} maxH={420}
+          <SheetSvg w={m.plano.w} h={m.plano.h} blocks={m.plano.blocks} maxH={520}
             label={`1 · Plano ${cm(m.plano.w)} × ${cm(m.plano.h)} dipotong jadi ${m.plano.ratio} lembar`} />
         ) : <div className="hint-box">Pilih kertas yang punya ukuran plano.</div>}
         <SheetSvg w={m.layout.sheetW} h={m.layout.sheetH} blocks={m.layout.blocks}
           offsetX={m.layout.offsetX} offsetY={m.layout.offsetY}
-          grip={hasMachine ? Number(m.machine.marginGrip) || 0 : 0} maxH={320}
+          grip={hasMachine ? Number(m.machine.marginGrip) || 0 : 0} maxH={360}
           label={`2 · Lembar cetak ${cm(m.layout.sheetW)} × ${cm(m.layout.sheetH)} isi ${m.up} naik`} />
       </div>
-      <div className="legend">
+      <div className="legend" style={{ justifyContent: 'center' }}>
         <span><i style={{ background: 'var(--accent-soft)', borderColor: 'var(--accent)' }} />Tegak</span>
         <span><i style={{ background: 'color-mix(in oklch, var(--warn) 22%, var(--surface))', borderColor: 'oklch(0.55 0.14 60)' }} />Miring</span>
-        {hasMachine && <span><i className="grip-swatch" />Gripper</span>}
+        {hasMachine && <span><i className="grip-swatch" />Gripper mesin</span>}
       </div>
       <div className="layout-stats">
-        <div className="stat-card"><div className="stat-label">Lembar cetak</div><div className="stat-value" style={{ fontSize: 20 }}>{fmtNum(m.totalSheets)}</div>
+        <div className="stat-card"><div className="stat-label">Lembar cetak</div><div className="stat-value" style={{ fontSize: 22 }}>{fmtNum(m.totalSheets)}</div>
           <div className="stat-sub">{fmtNum(m.baseSheets)} + {fmtNum(m.finInsheet)} finishing{hasMachine ? ` + ${fmtNum(m.machineInsheet)} mesin` : ''}</div></div>
-        <div className="stat-card"><div className="stat-label">Plano dibeli</div><div className="stat-value" style={{ fontSize: 20 }}>{m.plano ? fmtNum(m.plano.planos) : '–'}</div>
-          <div className="stat-sub">{m.plano ? `${cm(m.plano.w)} × ${cm(m.plano.h)} cm` : ''}</div></div>
-        <div className="stat-card"><div className="stat-label">Efisiensi</div><div className="stat-value" style={{ fontSize: 20 }}>{m.plano ? `${fmtNum(m.plano.eff, 1)}%` : '–'}</div>
-          <div className="stat-sub">kertas plano terpakai</div></div>
+        <div className="stat-card"><div className="stat-label">Plano dibeli</div><div className="stat-value" style={{ fontSize: 22 }}>{m.plano ? fmtNum(m.plano.planos) : '–'}</div>
+          <div className="stat-sub">{m.plano ? `${cm(m.plano.w)} × ${cm(m.plano.h)} · ${fmtRp(m.paperCost)}` : ''}</div></div>
+        <div className="stat-card"><div className="stat-label">Efisiensi plano</div><div className="stat-value" style={{ fontSize: 22 }}>{m.plano ? `${fmtNum(m.plano.eff, 1)}%` : '–'}</div>
+          <div className="stat-sub">{m.plano ? `sisa kertas ${fmtNum(100 - m.plano.eff, 1)}%` : ''}</div></div>
+        <div className="stat-card"><div className="stat-label">Biaya media ini</div><div className="stat-value" style={{ fontSize: 22 }}>{fmtNum(mediaCost)}</div>
+          <div className="stat-sub">kertas + cetak + finishing</div></div>
       </div>
-      {hasMachine && opts.length > 0 && (
-        <div style={{ marginTop: 14 }}>
-          <Field label="Susunan di lembar cetak">
-            <select value={input.layoutKey || ''} onChange={(e) => onPick(e.target.value || null)}>
-              <option value="">Otomatis (seperti app lama)</option>
-              {opts.map((o) => (
-                <option key={o.key} value={o.key}>
-                  {o.up} naik · {cm(o.sheetW)} × {cm(o.sheetH)} · {fmtRp(o.cost)}{o.cost === cheapest ? ' · termurah' : ''}{o.problems.length ? ' · ⚠ finishing' : ''}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="field-hint" style={{ marginTop: 6 }}>Harga di pilihan = kertas + cetak + finishing media ini.</div>
+      {hasMachine && cards.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <div className="row-between" style={{ marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Pilih susunan di lembar cetak</span>
+            {input.layoutKey && <button className="btn btn-ghost btn-sm" onClick={() => onPick(null)}>Kembali ke otomatis</button>}
+          </div>
+          <div className="opt-grid">
+            {cards.map((o) => {
+              const on = isCurrent(o);
+              const note = o.problems.length ? 'Terlalu besar untuk finishing'
+                : o.cost === cheapest ? 'Termurah'
+                  : `+${fmtNum(o.cost - cheapest)}`;
+              return (
+                <button key={o.key} type="button" className={`opt-card ${on ? 'active' : ''}`} aria-pressed={on} onClick={() => onPick(o.key)}>
+                  <span className="opt-up">{o.up} naik</span>
+                  <span className="opt-size">{cm(o.sheetW)} × {cm(o.sheetH)}{o.plano ? ` · 1:${o.plano}` : ''}</span>
+                  <span className="opt-cost">{fmtRp(o.cost)}</span>
+                  <span className={`opt-note ${o.problems.length ? 'bad' : o.cost === cheapest ? 'good' : ''}`}>{on && !input.layoutKey ? `Otomatis · ${note}` : note}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 
