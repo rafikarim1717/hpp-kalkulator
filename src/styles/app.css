@@ -877,3 +877,4 @@ textarea { resize: vertical; min-height: 60px; font-family: var(--sans); }
   .layout-figs.big { grid-template-columns: 1fr; }
   .layout-section .layout-stats { grid-template-columns: 1fr 1fr; }
 }
+.icon-danger:hover { color: var(--bad); }

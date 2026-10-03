@@ -43,9 +43,13 @@ const ProductsPage = ({ kind, products, master, onOpen, onNew, onDuplicate, onDe
                   <span className="mono" style={{ fontSize: 18 }}>{fmtRp(r.total)}</span>
                   <span className="mono" style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{fmtRp(r.perPcs)}/pcs</span>
                 </div>
-                <div className="row" style={{ marginTop: 10, gap: 6 }} onClick={(e) => e.stopPropagation()}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => onDuplicate(p.id)}>Duplikat</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { if (window.confirm(`Hapus ${p.name || 'produk ini'}?`)) onDelete(p.id); }}>Hapus</button>
+                <div className="row" style={{ marginTop: 10, gap: 4, justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+                  <button className="btn btn-ghost btn-icon" title="Duplikat" aria-label={`Duplikat ${p.name || 'produk'}`} onClick={() => onDuplicate(p.id)}>
+                    <Icon.Copy style={{ width: 15, height: 15 }} />
+                  </button>
+                  <button className="btn btn-ghost btn-icon icon-danger" title="Hapus" aria-label={`Hapus ${p.name || 'produk'}`} onClick={() => { if (window.confirm(`Hapus ${p.name || 'produk ini'}?`)) onDelete(p.id); }}>
+                    <Icon.Trash style={{ width: 15, height: 15 }} />
+                  </button>
                 </div>
               </div>
             );
