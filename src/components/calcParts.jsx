@@ -91,22 +91,32 @@ const SheetSvg = ({ w, h, blocks, offsetX = 0, offsetY = 0, grip = 0, gripSide =
 };
 
 // Section layout untuk satu media (lebar penuh): plano → lembar cetak, angka, dan kartu pilihan susunan.
+const TOP_OPTIONS = 6;
+
 export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
+  const [showAll, setShowAll] = React.useState(false);
   if (!m) return null;
   const hasMachine = !!m.machine;
   const title = `Layout Media ${index + 1}`;
   if (!(m.w > 0 && m.h > 0)) {
     return <section className="card layout-section"><h2 className="layout-title">{title}</h2><div className="hint-box">Isi ukuran hasil jadi untuk melihat layout.</div></section>;
   }
-  // kartu pilihan: satu per jumlah naik + ukuran lembar, ambil yang termurah, urut dari naik terkecil
-  const byKey = new Map();
-  for (const o of opts) {
-    const k = `${o.up}|${Math.min(o.sheetW, o.sheetH)}x${Math.max(o.sheetW, o.sheetH)}`; // lembar sama walau diputar
-    if (!byKey.has(k) || o.cost < byKey.get(k).cost) byKey.set(k, o);
-  }
-  const cards = [...byKey.values()].sort((a, b) => a.up - b.up || a.cost - b.cost);
-  const cheapest = cards.length ? Math.min(...cards.filter((o) => !o.problems.length).map((o) => o.cost)) : null;
+  // Kartu pilihan. Ukuran lembar yang sama (walau diputar) cukup sekali: ambil yang naiknya
+  // paling banyak, karena lembar sama dengan naik lebih sedikit pasti lebih boros.
   const isCurrent = (o) => o.up === m.up && o.sheetW === m.layout.sheetW && o.sheetH === m.layout.sheetH;
+  const bySheet = new Map();
+  for (const o of opts) {
+    const k = `${Math.min(o.sheetW, o.sheetH)}x${Math.max(o.sheetW, o.sheetH)}`;
+    const cur = bySheet.get(k);
+    if (!cur || o.up > cur.up || (o.up === cur.up && o.cost < cur.cost) || (isCurrent(o) && o.up === cur.up)) bySheet.set(k, o);
+  }
+  const allCards = [...bySheet.values()].sort((a, b) => a.up - b.up || a.cost - b.cost);
+  const valid = allCards.filter((o) => !o.problems.length);
+  const cheapest = valid.length ? Math.min(...valid.map((o) => o.cost)) : null;
+  // tampilkan beberapa yang termurah saja + yang sedang dipakai; sisanya lewat "Lihat semua"
+  const top = new Set([...valid].sort((a, b) => a.cost - b.cost || b.up - a.up).slice(0, TOP_OPTIONS).map((o) => o.key));
+  const cards = showAll ? allCards : allCards.filter((o) => top.has(o.key) || isCurrent(o));
+  const hidden = allCards.length - cards.length;
   return (
     <section className="card layout-section" aria-label={title}>
       <div className="row-between" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
@@ -141,7 +151,7 @@ export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
         <div className="stat-card"><div className="stat-label">Biaya media ini</div><div className="stat-value" style={{ fontSize: 22 }}>{fmtNum(mediaCost)}</div>
           <div className="stat-sub">kertas + cetak + finishing</div></div>
       </div>
-      {hasMachine && cards.length > 0 && (
+      {hasMachine && allCards.length > 0 && (
         <div style={{ marginTop: 20 }}>
           <div className="row-between" style={{ marginBottom: 10 }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>Pilih susunan di lembar cetak</span>
@@ -163,6 +173,11 @@ export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
               );
             })}
           </div>
+          {(hidden > 0 || showAll) && allCards.length > TOP_OPTIONS && (
+            <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 10 }} onClick={() => setShowAll(!showAll)} aria-expanded={showAll}>
+              {showAll ? 'Tampilkan yang termurah saja' : `Lihat semua susunan (${hidden} lagi)`}
+            </button>
+          )}
         </div>
       )}
     </section>
