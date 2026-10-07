@@ -1,7 +1,7 @@
 // Tiap template order dicek: hitungannya jalan, tidak ada peringatan, dan aturan percetakan
 // yang penting terpenuhi. Kalau rumus berubah dan angka bergeser, test di bawah yang gagal.
 import { describe, expect, it } from 'vitest';
-import { calcOffset, calcOffsetMedia, mediaCostOf, plateSets } from './engine.js';
+import { calcOffset, calcOffsetMedia, mediaCostOf, plateSets, shrinkSuggestion } from './engine.js';
 import { DEFAULT_FINISHING, DEFAULT_MACHINES, DEFAULT_OTHERS, DEFAULT_PAPERS, DEFAULT_SETTINGS } from './masterData.js';
 import { OFFSET_TEMPLATES, productFromTemplate } from './templates.js';
 
@@ -171,5 +171,35 @@ describe('media baru yang ukurannya belum diisi', () => {
     const b = calcOffset({ ...p, media: [...p.media, kosong] }, master);
     expect(b.total).toBe(a.total);
     expect(b.media[2].warnings).toEqual([]);
+  });
+});
+
+describe('saran kecilkan ukuran supaya plano dipotong habis', () => {
+  const sorm = { ...DEFAULT_MACHINES[0], id: 'sorm', name: 'SORM 72', minW: 30, minH: 40, maxW: 52, maxH: 72, printW: 51, printH: 71, marginSide: 0.5, marginGrip: 0.8 };
+  const ivory = { id: 'iv', name: 'Ivory 300', gsm: 300, priceBy: 'sheet', sizes: [{ w: 79, h: 109, price: 4000 }] };
+  const m2 = { ...master, papers: [ivory], machines: [sorm] };
+  const media = (w, h) => ({ id: 'a', paperId: 'iv', w, h, perPcs: 1, machine: { machineId: 'sorm', front: 4 }, finishings: [] });
+
+  it('kasus client: 39,5 × 54,5 → saran 38,7 × 54, plano 1 jadi 4 (bukan 2)', () => {
+    const s = shrinkSuggestion(media(39.5, 54.5), { qty: 1000 }, m2);
+    expect([s.w, s.h]).toEqual([38.7, 54]);
+    expect([s.curRatio, s.ratio]).toEqual([2, 4]);
+    expect(s.planos).toBe(s.curPlanos / 2);
+  });
+
+  it('urutan lebar/tinggi dibalik tetap dapat saran yang sama', () => {
+    const s = shrinkSuggestion(media(54.5, 39.5), { qty: 1000 }, m2);
+    expect([s.w, s.h]).toEqual([54, 38.7]);
+  });
+
+  it('ukuran yang sudah pas tidak diberi saran', () => {
+    expect(shrinkSuggestion(media(38, 53), { qty: 1000 }, m2)).toBeNull();
+  });
+
+  it('template standar (A4, A5, kalender, dus, dll) tidak diganggu saran', () => {
+    for (const t of OFFSET_TEMPLATES) {
+      const { p } = build(t.id);
+      for (const m of p.media) expect(shrinkSuggestion(m, p, master)).toBeNull();
+    }
   });
 });

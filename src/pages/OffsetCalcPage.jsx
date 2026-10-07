@@ -5,8 +5,9 @@ import { CostCard, Check, Fold, MediaLayout, /* NegoCard, */ NumField, Select, S
 import { FinishingList, OthersCard } from '../components/editors.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
-import { calcOffset, calcOffsetMedia, mediaCostOf } from '../lib/engine.js';
+import { calcOffset, calcOffsetMedia, mediaCostOf, shrinkSuggestion } from '../lib/engine.js';
 import { newId } from '../lib/masterData.js';
+import { fmtNum, fmtRp } from '../lib/format.js';
 import { countErrors, machineErrors, paperErrors } from '../lib/validate.js';
 
 export function newOffsetMedia(master) {
@@ -39,6 +40,8 @@ export function mediaErrors(m, master) {
   if (mc && countErrors(machineErrors(mc))) e.master = `${e.master ? `${e.master} ` : ''}Data mesin ${mc.name} belum benar. Cek di Data Master → Mesin.`;
   return e;
 }
+
+const fmtCm = (n) => fmtNum(n, Number.isInteger(n) ? 0 : 1);
 
 function machineSummary(m, master) {
   if (!m.machine) return 'Tidak dicetak (kertas dipotong saja)';
@@ -74,6 +77,10 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
 
   const errs = product.media.map((m) => mediaErrors(m, master));
   const invalid = Number(product.qty) <= 0 || errs.some((e) => Object.keys(e).length > 0);
+  const suggestions = React.useMemo(
+    () => product.media.map((m, i) => (Object.keys(errs[i]).length ? null : shrinkSuggestion(m, product, master))),
+    [product, master], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const warnings = result.media.flatMap((m, i) => m.warnings.map((w) => (product.media.length > 1 ? `Media ${i + 1}: ${w}` : w)));
   const otherCosts = Object.fromEntries(result.others.map((o) => [o.id, o.cost]));
 
@@ -153,9 +160,22 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                       <NumField label="Halaman yang desainnya beda" suffix="hlm" value={m.designs || 1} onChange={(v) => setMedia(m.id, { designs: v })}
                         hint={`Dari ${m.perPcs} halaman. Beda semua = ${m.perPcs}, sama semua = 1`} />
                     )}
-                    <NumField label="Lebar hasil jadi" suffix="cm" value={m.w} error={errs[i].w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })} />
+                    <NumField label="Lebar hasil jadi" suffix="cm" value={m.w} error={errs[i].w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })}
+                      hint="Ukuran produk setelah dipotong, bukan potongan plano" />
                     <NumField label="Tinggi hasil jadi" suffix="cm" value={m.h} error={errs[i].h} onChange={(v) => setMedia(m.id, { h: v, layoutKey: null })} />
                   </div>
+
+                  {suggestions[i] && (() => {
+                    const sg = suggestions[i];
+                    return (
+                      <div className="suggest-box" role="note">
+                        <div>
+                          <strong>Bisa lebih hemat.</strong> Kalau hasil jadi dikecilkan sedikit jadi <b>{fmtCm(sg.w)} × {fmtCm(sg.h)} cm</b>, 1 plano {fmtCm(sg.plano.w)} × {fmtCm(sg.plano.h)} bisa dipotong jadi <b>{sg.ratio} lembar</b> (sekarang {sg.curRatio}). Kertas yang dibeli turun dari {sg.curPlanos} ke {sg.planos} plano, hemat sekitar <b>{fmtRp(sg.saving)}</b>.
+                        </div>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setMedia(m.id, { w: sg.w, h: sg.h, layoutKey: null })}>Pakai ukuran ini</button>
+                      </div>
+                    );
+                  })()}
 
                   <Fold title="Mesin cetak" open={openSet.has(m.id)} onToggle={() => openSet.toggle(m.id)}
                     summary={machineSummary(m, master)}

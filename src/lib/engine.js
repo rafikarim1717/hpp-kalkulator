@@ -466,3 +466,62 @@ export function calcDigital(product, master) {
 }
 
 function round2(n) { return Math.round(n * 100) / 100; }
+
+// ── Saran ukuran ──────────────────────────────────────────────────────────
+// Kalau hasil jadi sedikit kebesaran sehingga plano tidak bisa dipotong habis (mis. ¼ plano),
+// cari ukuran sedikit lebih kecil yang membuat plano dipotong rapi dan biaya media turun.
+// Contoh: 39,5 × 54,5 di SORM 72 → 1 plano cuma jadi 2. Dikecilkan ke 38,7 × 54 → jadi 4.
+const MAX_SHRINK_CM = 1.5;    // pengurangan maksimal per sisi
+const MAX_SHRINK_PCT = 0.05;  // ... dan maksimal 5% dari sisi itu
+const MIN_SAVING_PCT = 0.08;  // saran baru muncul kalau hematnya minimal 8%
+
+export function shrinkSuggestion(media, product, master) {
+  const paper = master.papers.find((p) => p.id === media.paperId);
+  const machine = media.machine ? master.machines.find((x) => x.id === media.machine.machineId) : null;
+  const w = num(media.w), h = num(media.h);
+  if (!paper || !machine || !(w > 0 && h > 0) || !(num(product.qty) > 0)) return null;
+  const cur = calcOffsetMedia({ ...media, layoutKey: null }, product, master);
+  const curCost = mediaCostOf(cur);
+  if (!(curCost > 0) || !cur.plano) return null;
+  const b = media.machine.bleed ? num(master.settings.bleed) : 0;
+  const side = num(machine.marginSide), grip = num(machine.marginGrip);
+  const limit = (len) => Math.max(0.5, Math.min(MAX_SHRINK_CM, len * MAX_SHRINK_PCT));
+  const floor1 = (v) => Math.floor(v * 10 + 1e-6) / 10;
+
+  const seen = new Set();
+  const cands = [];
+  for (const s of paper.sizes || []) {
+    for (let a = 1; a <= 4; a++) for (let c = 1; c <= 4; c++) {
+      // lembar cetak = plano dibagi rata (dipotong habis)
+      const sw = num(s.w) / a, sh = num(s.h) / c;
+      const short = Math.min(sw, sh), long = Math.max(sw, sh);
+      const availS = short - grip, availL = long - side; // gripper di sisi panjang
+      for (const [pw, ph] of [[w, h], [h, w]]) { // produk tegak / diputar
+        const nS = Math.floor(availS / (pw + 2 * b) + 1e-9), nL = Math.floor(availL / (ph + 2 * b) + 1e-9);
+        for (const ks of [nS, nS + 1]) for (const kl of [nL, nL + 1]) {
+          if (ks < 1 || kl < 1) continue;
+          const nw = Math.min(pw, floor1(availS / ks - 2 * b)), nh = Math.min(ph, floor1(availL / kl - 2 * b));
+          const [rw, rh] = pw === w ? [nw, nh] : [nh, nw]; // kembalikan ke urutan input
+          if (rw <= 0 || rh <= 0 || (rw === w && rh === h)) continue;
+          if (w - rw > limit(w) || h - rh > limit(h)) continue;
+          const key = `${rw}x${rh}`;
+          if (!seen.has(key)) { seen.add(key); cands.push([rw, rh]); }
+        }
+      }
+    }
+  }
+  let best = null;
+  for (const [rw, rh] of cands) {
+    const r = calcOffsetMedia({ ...media, w: rw, h: rh, layoutKey: null }, product, master);
+    if (!r.plano || r.warnings.length) continue;
+    if (r.plano.ratio <= cur.plano.ratio) continue; // harus bikin plano terpotong lebih banyak
+    const saving = curCost - mediaCostOf(r);
+    if (saving < curCost * MIN_SAVING_PCT) continue;
+    // pilih yang hematnya paling besar; kalau mirip, yang ukurannya paling sedikit berubah
+    const shrink = (w - rw) + (h - rh);
+    if (!best || saving > best.saving + 1 || (Math.abs(saving - best.saving) <= 1 && shrink < best.shrink)) {
+      best = { w: rw, h: rh, saving, shrink, ratio: r.plano.ratio, curRatio: cur.plano.ratio, planos: r.plano.planos, curPlanos: cur.plano.planos, plano: { w: r.plano.w, h: r.plano.h }, up: r.up };
+    }
+  }
+  return best;
+}

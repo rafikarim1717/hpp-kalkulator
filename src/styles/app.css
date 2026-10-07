@@ -954,3 +954,7 @@ body { font-family: var(--sans); font-size: 15px; font-variant-numeric: tabular-
 .field-hint, .field-error { font-size: 12px; }
 .stat-sub, .fold-sum, .media-chip-sub, .tpl-desc { font-size: 12.5px; }
 .tag { font-family: var(--sans); letter-spacing: 0; }
+.suggest-box { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.5;
+  background: color-mix(in oklch, var(--good) 9%, var(--surface)); border: 1px solid color-mix(in oklch, var(--good) 35%, transparent); }
+.suggest-box strong { color: var(--good); }
+.suggest-box > div { flex: 1 1 320px; }
