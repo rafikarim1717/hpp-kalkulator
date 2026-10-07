@@ -163,3 +163,13 @@ describe('ukuran laminasi manual', () => {
     expect(manual.cost).toBeLessThan(auto.cost);
   });
 });
+
+describe('media baru yang ukurannya belum diisi', () => {
+  it('tidak menambah biaya dan tidak memunculkan peringatan', () => {
+    const { p, r: a } = build('undangan-amplop');
+    const kosong = { id: 'x', paperId: 'ac190', w: 0, h: 0, perPcs: 1, machine: { machineId: 'gto52', front: 4 }, finishings: [] };
+    const b = calcOffset({ ...p, media: [...p.media, kosong] }, master);
+    expect(b.total).toBe(a.total);
+    expect(b.media[2].warnings).toEqual([]);
+  });
+});

@@ -48,8 +48,12 @@ function machineSummary(m, master) {
 
 const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) => {
   const openSet = useOpenSet();
+  const goMedia = (id) => document.getElementById(`media-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const [pendingScroll, setPendingScroll] = React.useState(null);
+  React.useEffect(() => { if (pendingScroll) { goMedia(pendingScroll); setPendingScroll(null); } }, [pendingScroll, product.media.length]);
   const result = React.useMemo(() => calcOffset(product, master), [product, master]);
   const set = (patch) => setProduct({ ...product, ...patch });
+  const addMedia = () => { const nm = newOffsetMedia(master); set({ media: [...product.media, nm] }); setPendingScroll(nm.id); };
   const setMedia = (id, patch) => set({ media: product.media.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
   const setMachine = (m, patch) => setMedia(m.id, { machine: { ...m.machine, ...patch } });
 
@@ -93,13 +97,33 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
             <Field label="Nama produk"><input type="text" value={product.name} onChange={(e) => set({ name: e.target.value })} placeholder="mis. Brosur A5" /></Field>
             <NumField label="Jumlah" suffix="pcs" value={product.qty} onChange={(v) => set({ qty: v })} error={Number(product.qty) <= 0 ? 'Wajib diisi' : null} />
           </div>
+          <div className="media-nav">
+            <div className="media-nav-head">
+              <span className="field-label" style={{ margin: 0 }}>Bagian produk (media)</span>
+              <span className="field-hint" style={{ margin: 0 }}>Produk punya beberapa bagian? mis. undangan + amplop, isi + cover</span>
+            </div>
+            <div className="media-nav-list">
+              {product.media.map((m, i) => {
+                const r = result.media[i];
+                return (
+                  <button key={m.id} type="button" className="media-chip" onClick={() => goMedia(m.id)}>
+                    <span className="media-chip-n">Media {i + 1}</span>
+                    <span className="media-chip-sub">{r?.paper?.name || 'Pilih kertas'}{m.w && m.h ? ` · ${m.w} × ${m.h}` : ''}</span>
+                  </button>
+                );
+              })}
+              <button type="button" className="btn btn-primary btn-sm media-add" onClick={addMedia}>
+                <Icon.Plus style={{ width: 14, height: 14 }} /> Tambah media
+              </button>
+            </div>
+          </div>
         </div>
 
         {product.media.map((m, i) => {
           const r = result.media[i];
           return (
             <React.Fragment key={m.id}>
-            <section className="card media-card" aria-label={`Media ${i + 1}`}>
+            <section className="card media-card" id={`media-${m.id}`} aria-label={`Media ${i + 1}`}>
               <div className="row-between" style={{ marginBottom: 14 }}>
                 <div className="section-eyebrow">Media {i + 1}{r?.paper ? ` · ${r.paper.name}` : ''}</div>
                 {product.media.length > 1 && (
@@ -161,7 +185,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
         })}
 
         <button className="btn btn-secondary" style={{ borderStyle: 'dashed' }}
-          onClick={() => set({ media: [...product.media, newOffsetMedia(master)] })}>
+          onClick={addMedia}>
           <Icon.Plus style={{ width: 14, height: 14 }} /> Tambah media (mis. amplop, cover)
         </button>
 

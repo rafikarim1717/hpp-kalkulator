@@ -294,7 +294,8 @@ export function calcOffsetMedia(media, product, master) {
 
   // 2. jumlah lembar, per set plat (desain berbeda → plat berbeda)
   const designs = Math.max(1, Math.floor(num(media.designs)) || 1);
-  const sets = plateSets(designs, up, pcs).map((st) => {
+  // ukuran belum diisi → belum ada lembar yang dihitung (tidak ada biaya plat/kertas palsu)
+  const sets = plateSets(designs, up, iw > 0 && ih > 0 ? pcs : 0).map((st) => {
     const finIns = st.base > 0 ? finishings.reduce((s, f) => s + finishingInsheet(f, fset[f.type], st.base), 0) : 0;
     const print = st.base > 0 ? st.base + finIns : 0;
     const mIns = machine && print > 0 ? Math.max(num(machine.insheetMin), ceil(print * num(machine.insheetPct) / 100)) : 0;
