@@ -1,7 +1,7 @@
 // Kalkulasi produk offset: ringkasan harga di atas, tiap media = kartu isian lalu section layout selebar halaman,
 // lalu biaya lain + rincian + nego.
 import React from 'react';
-import { CostCard, Check, Fold, MediaLayout, NegoCard, NumField, Select, SummaryBar, Warnings, useOpenSet } from '../components/calcParts.jsx';
+import { CostCard, Check, Fold, MediaLayout, /* NegoCard, */ NumField, Select, SummaryBar, Warnings, useOpenSet } from '../components/calcParts.jsx';
 import { FinishingList, OthersCard } from '../components/editors.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
@@ -203,7 +203,8 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
           <OthersCard items={product.others} defs={master.others} costs={otherCosts} onChange={(others) => set({ others })} />
           <div className="stack">
             <CostCard result={result} settings={master.settings} />
-            <NegoCard result={result} qty={product.qty} />
+            {/* Nego harga disembunyikan dulu (belum dipakai client). Hapus komentar ini untuk menampilkan lagi.
+            <NegoCard result={result} qty={product.qty} /> */}
           </div>
         </div>
       </div>

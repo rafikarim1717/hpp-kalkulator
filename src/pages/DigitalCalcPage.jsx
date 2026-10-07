@@ -1,6 +1,6 @@
 // Kalkulasi produk digital printing: mesin → kertas → finishing.
 import React from 'react';
-import { CostCard, Check, NegoCard, NumField, Select, TotalCard, Warnings } from '../components/calcParts.jsx';
+import { CostCard, Check, /* NegoCard, */ NumField, Select, TotalCard, Warnings } from '../components/calcParts.jsx';
 import { FinishingList, OthersCard } from '../components/editors.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
@@ -93,7 +93,8 @@ const DigitalCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =
           <TotalCard result={result} qty={product.qty} />
           <Warnings list={warnings} />
           <CostCard result={result} settings={master.settings} />
-          <NegoCard result={result} qty={product.qty} />
+          {/* Nego harga disembunyikan dulu (belum dipakai client). Hapus komentar ini untuk menampilkan lagi.
+          <NegoCard result={result} qty={product.qty} /> */}
         </div>
       </div>
     </div>
