@@ -194,11 +194,6 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
           );
         })}
 
-        <button className="btn btn-secondary" style={{ borderStyle: 'dashed' }}
-          onClick={addMedia}>
-          <Icon.Plus style={{ width: 14, height: 14 }} /> Tambah media (mis. amplop, cover)
-        </button>
-
         <div className="cost-split">
           <OthersCard items={product.others} defs={master.others} costs={otherCosts} onChange={(others) => set({ others })} />
           <div className="stack">
