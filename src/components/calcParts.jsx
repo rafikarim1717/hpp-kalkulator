@@ -17,8 +17,8 @@ export const Check = ({ label, checked, onChange }) => (
   </label>
 );
 
-export const Select = ({ label, value, onChange, options, placeholder }) => (
-  <Field label={label}>
+export const Select = ({ label, value, onChange, options, placeholder, error }) => (
+  <Field label={label} error={error}>
     <select value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

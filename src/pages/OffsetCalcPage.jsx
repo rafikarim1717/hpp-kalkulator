@@ -7,6 +7,7 @@ import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
 import { calcOffset, calcOffsetMedia, mediaCostOf } from '../lib/engine.js';
 import { newId } from '../lib/masterData.js';
+import { countErrors, machineErrors, paperErrors } from '../lib/validate.js';
 
 export function newOffsetMedia(master) {
   return {
@@ -32,6 +33,10 @@ export function mediaErrors(m, master) {
     if (pw > 0 && ph > 0 && !fits) e.w = e.h = `Terlalu besar untuk ${mc.name} (area cetak maks ${pw} × ${ph} cm)`;
   }
   if (Number(m.perPcs) < 0) e.perPcs = 'Tidak boleh minus';
+  const paper = master.papers.find((p) => p.id === m.paperId);
+  if (!paper) e.paperId = 'Pilih kertas';
+  else if (countErrors(paperErrors(paper))) e.master = `Data kertas ${paper.name} belum lengkap. Cek di Data Master → Kertas.`;
+  if (mc && countErrors(machineErrors(mc))) e.master = `${e.master ? `${e.master} ` : ''}Data mesin ${mc.name} belum benar. Cek di Data Master → Mesin.`;
   return e;
 }
 
@@ -86,6 +91,11 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
         {invalid && (
           <div className="invalid-box" role="alert">
             <strong>Harga belum bisa dipakai.</strong> Ada isian yang belum benar (ditandai merah). Perbaiki dulu supaya hitungannya tidak menyesatkan.
+            {errs.some((e) => e.master) && (
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                {[...new Set(errs.map((e) => e.master).filter(Boolean))].map((t) => <li key={t}>{t}</li>)}
+              </ul>
+            )}
           </div>
         )}
         <SummaryBar result={result} qty={product.qty} invalid={invalid} />
@@ -134,7 +144,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
               </div>
               <div className="stack">
                   <div className="grid-auto">
-                    <Select label="Kertas" value={m.paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
+                    <Select label="Kertas" value={m.paperId} error={errs[i].paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
                       options={master.papers.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
                     <NumField label="Jumlah halaman" suffix="hlm" value={m.perPcs} error={errs[i].perPcs}
                       onChange={(v) => setMedia(m.id, (m.designs || 1) === (m.perPcs || 1) ? { perPcs: v, designs: v } : { perPcs: v })}

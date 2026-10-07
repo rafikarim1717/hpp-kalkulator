@@ -4,6 +4,7 @@ import { Check, NumField, Select } from '../components/calcParts.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field, Seg } from '../components/ui.jsx';
 import { DEFAULT_FINISHING, FINISHING_TYPES, OTHER_BY, newId } from '../lib/masterData.js';
+import { countErrors, machineErrors, paperErrors } from '../lib/validate.js';
 
 const Header = ({ title, em, sub, action }) => (
   <div className="page-header row-between" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -15,13 +16,18 @@ const Header = ({ title, em, sub, action }) => (
   </div>
 );
 
-const Fields = ({ obj, schema, onChange, cols = 4 }) => (
+const Fields = ({ obj, schema, onChange, cols = 4, errors = {} }) => (
   <div className={`grid-${cols}`}>
     {schema.map((f) => (
-      <NumField key={f.key} label={f.label} suffix={f.suffix} value={obj[f.key]} onChange={(v) => onChange({ ...obj, [f.key]: v })} />
+      <NumField key={f.key} label={f.label} suffix={f.suffix} value={obj[f.key]} error={errors[f.key]} onChange={(v) => onChange({ ...obj, [f.key]: v })} />
     ))}
   </div>
 );
+
+// Pita peringatan di atas kartu data master yang isiannya belum benar
+const ErrBadge = ({ count }) => (count > 0
+  ? <div className="master-err" role="alert">{count} isian perlu dicek. Selama belum diperbaiki, harga yang memakai data ini ditandai belum bisa dipakai.</div>
+  : null);
 
 const DelBtn = ({ onClick, label = 'Hapus' }) => (
   <button className="btn btn-ghost btn-sm" onClick={onClick}><Icon.Trash style={{ width: 13, height: 13 }} /> {label}</button>
@@ -37,11 +43,13 @@ export const PapersPage = ({ papers, setPapers }) => (
     <div className="stack">
       {papers.map((p) => {
         const set = (patch) => setPapers(updList(papers, p.id, { ...p, ...patch }));
+        const err = paperErrors(p);
         return (
           <div key={p.id} className="card">
+            <ErrBadge count={countErrors(err)} />
             <div className="grid-3" style={{ marginBottom: 14 }}>
-              <Field label="Nama"><input type="text" value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
-              <NumField label="Gramasi" suffix="gsm" value={p.gsm} onChange={(v) => set({ gsm: v })} />
+              <Field label="Nama" error={err.name}><input type="text" value={p.name} onChange={(e) => set({ name: e.target.value })} /></Field>
+              <NumField label="Gramasi" suffix="gsm" value={p.gsm} error={err.gsm} onChange={(v) => set({ gsm: v })} />
               <Field label="Harga per"><Seg value={p.priceBy} onChange={(v) => set({ priceBy: v })} options={[{ value: 'sheet', label: 'Lembar' }, { value: 'ream', label: 'Rim (500)' }]} /></Field>
             </div>
             <table className="table">
@@ -51,15 +59,16 @@ export const PapersPage = ({ papers, setPapers }) => (
                   const setS = (patch) => set({ sizes: p.sizes.map((x, j) => (j === k ? { ...x, ...patch } : x)) });
                   return (
                     <tr key={k}>
-                      <td><NumField value={s.w} onChange={(v) => setS({ w: v })} suffix="cm" /></td>
-                      <td><NumField value={s.h} onChange={(v) => setS({ h: v })} suffix="cm" /></td>
-                      <td><NumField value={s.price} onChange={(v) => setS({ price: v })} suffix="Rp" /></td>
+                      <td><NumField value={s.w} error={err.sizes[k]?.w} onChange={(v) => setS({ w: v })} suffix="cm" /></td>
+                      <td><NumField value={s.h} error={err.sizes[k]?.h} onChange={(v) => setS({ h: v })} suffix="cm" /></td>
+                      <td><NumField value={s.price} error={err.sizes[k]?.price} onChange={(v) => setS({ price: v })} suffix="Rp" /></td>
                       <td style={{ width: 60 }}><button className="btn btn-ghost btn-icon" aria-label="Hapus ukuran" onClick={() => set({ sizes: p.sizes.filter((_, j) => j !== k) })}><Icon.X style={{ width: 13, height: 13 }} /></button></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            {err.general && <div className="field-error" style={{ marginTop: 8 }}>{err.general}</div>}
             <div className="row-between" style={{ marginTop: 12 }}>
               <button className="btn btn-secondary btn-sm" onClick={() => set({ sizes: [...p.sizes, { w: 0, h: 0, price: 0 }] })}>+ Ukuran plano</button>
               <DelBtn onClick={() => { if (window.confirm(`Hapus ${p.name}?`)) setPapers(papers.filter((x) => x.id !== p.id)); }} label="Hapus kertas" />
@@ -95,15 +104,19 @@ export const MachinesPage = ({ machines, setMachines }) => (
     <Header title="Mesin" em="offset" sub="Ukuran, insheet, plat, dan ongkos cetak per mesin."
       action={<button className="btn btn-primary" onClick={() => setMachines([...machines, { ...machines[0], id: newId('mc'), name: 'Mesin baru' }])}><Icon.Plus style={{ width: 14, height: 14 }} /> Tambah mesin</button>} />
     <div className="stack">
-      {machines.map((m) => (
-        <div key={m.id} className="card">
-          <div className="row-between" style={{ marginBottom: 14 }}>
-            <Field label="Nama mesin"><input type="text" value={m.name} onChange={(e) => setMachines(updList(machines, m.id, { ...m, name: e.target.value }))} /></Field>
-            {machines.length > 1 && <DelBtn onClick={() => { if (window.confirm(`Hapus ${m.name}?`)) setMachines(machines.filter((x) => x.id !== m.id)); }} />}
+      {machines.map((m) => {
+        const err = machineErrors(m);
+        return (
+          <div key={m.id} className="card">
+            <ErrBadge count={countErrors(err)} />
+            <div className="row-between" style={{ marginBottom: 14 }}>
+              <Field label="Nama mesin" error={err.name}><input type="text" value={m.name} onChange={(e) => setMachines(updList(machines, m.id, { ...m, name: e.target.value }))} /></Field>
+              {machines.length > 1 && <DelBtn onClick={() => { if (window.confirm(`Hapus ${m.name}?`)) setMachines(machines.filter((x) => x.id !== m.id)); }} />}
+            </div>
+            <Fields obj={m} schema={MACHINE_FIELDS} errors={err} onChange={(next) => setMachines(updList(machines, m.id, next))} />
           </div>
-          <Fields obj={m} schema={MACHINE_FIELDS} onChange={(next) => setMachines(updList(machines, m.id, next))} />
-        </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 );
