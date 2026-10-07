@@ -27,13 +27,13 @@ describe('semua template', () => {
     const totals = Object.fromEntries(OFFSET_TEMPLATES.map((t) => [t.id, Math.round(build(t.id).r.total)]));
     expect(totals).toMatchInlineSnapshot(`
       {
-        "brosur-a5": 765423,
+        "brosur-a5": 764684,
         "brosur-lipat-3": 2711432,
         "dus-skincare": 1684160,
         "hang-tag": 1739549,
         "kalender-dinding": 6581203,
-        "kalender-meja": 5183568,
-        "undangan-amplop": 2566464,
+        "kalender-meja": 5249808,
+        "undangan-amplop": 2561050,
       }
     `);
   });
@@ -128,5 +128,38 @@ describe('alat per naik: pisau & klise poly', () => {
     expect(four.up).toBe(4);
     expect(four.finItems.find((f) => f.type === 'poly').parts[0].cost).toBe(Math.max(40000, raw(four)));
     expect(one.finItems.find((f) => f.type === 'poly').parts[0].cost).toBe(Math.max(40000, raw(one)));
+  });
+});
+
+describe('gripper selalu di sisi panjang lembar cetak', () => {
+  const sorm = { ...DEFAULT_MACHINES[0], id: 'sorm', name: 'SORM 72', minW: 30, minH: 40, maxW: 52, maxH: 72, printW: 51, printH: 71, marginSide: 0.5, marginGrip: 0.8 };
+  const ivory = { id: 'iv', name: 'Ivory 300', gsm: 300, priceBy: 'sheet', sizes: [{ w: 79, h: 109, price: 4000 }] };
+  const m2 = { ...master, papers: [ivory], machines: [sorm] };
+  const run = (w, h) => calcOffsetMedia({ id: 'a', paperId: 'iv', w, h, perPcs: 1, machine: { machineId: 'sorm', front: 4 }, finishings: [] }, { qty: 1000 }, m2);
+
+  for (const [w, h] of [[24, 38], [38, 24], [39.5, 54.5], [12, 12], [5, 9]]) {
+    it(`${w} × ${h}: gripper menempel di sisi terpanjang`, () => {
+      const L = run(w, h).layout;
+      const gripEdge = L.gripSide === 'left' ? L.sheetH : L.sheetW;
+      expect(gripEdge).toBeGreaterThanOrEqual(Math.max(L.sheetW, L.sheetH) - 0.5);
+    });
+  }
+
+  it('lebar & tinggi dibalik → hasil sama', () => {
+    const a = run(24, 38), b = run(38, 24);
+    expect([a.up, a.plano.ratio, mediaCostOf(a)]).toEqual([b.up, b.plano.ratio, mediaCostOf(b)]);
+    expect([a.layout.sheetW, a.layout.sheetH].sort()).toEqual([b.layout.sheetW, b.layout.sheetH].sort());
+  });
+});
+
+describe('ukuran laminasi manual', () => {
+  it('kosong = hasil jadi + bleed, diisi = pakai ukuran manual', () => {
+    const { p } = build('brosur-a5');
+    const lam = (extra) => calcOffsetMedia({ ...p.media[0], finishings: [{ type: 'laminating', front: 'Doff', ...extra }] }, { ...p, qty: 5000 }, master).finItems[0];
+    const auto = lam({}), manual = lam({ lamW: 10, lamH: 10 });
+    expect(auto.size).toBe('15.8 × 22');
+    expect(manual.size).toBe('10 × 10');
+    expect(manual.cost).toBe(Math.max(150000, 5000 * 10 * 10 * 0.18));
+    expect(manual.cost).toBeLessThan(auto.cost);
   });
 });

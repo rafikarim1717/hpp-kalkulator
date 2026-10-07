@@ -4,8 +4,8 @@ import { negotiate } from '../lib/engine.js';
 import { fmtNum, fmtRp } from '../lib/format.js';
 import { Field, NumInput } from './ui.jsx';
 
-export const NumField = ({ label, value, onChange, suffix, hint, step }) => (
-  <Field label={label} suffix={suffix} hint={hint}>
+export const NumField = ({ label, value, onChange, suffix, hint, step, error }) => (
+  <Field label={label} suffix={suffix} hint={hint} error={error}>
     <NumInput value={value} onChange={onChange} step={step} />
   </Field>
 );
@@ -26,10 +26,37 @@ export const Select = ({ label, value, onChange, options, placeholder }) => (
   </Field>
 );
 
+// Bagian yang bisa dilipat: judul + ringkasan satu baris, klik untuk buka isian lengkapnya.
+export const Fold = ({ title, summary, cost, open, onToggle, actions, children }) => {
+  const canOpen = !!children;
+  return (
+    <div className={`fold${open && canOpen ? ' is-open' : ''}`}>
+      <div className="fold-head">
+        <button type="button" className="fold-toggle" aria-expanded={canOpen ? !!open : undefined} onClick={canOpen ? onToggle : undefined} disabled={!canOpen}>
+          {canOpen && <span className="fold-chev" aria-hidden="true">›</span>}
+          <span className="fold-title">{title}</span>
+          {summary && <span className="fold-sum">{summary}</span>}
+        </button>
+        {cost != null && <span className="mono fold-cost">{Math.round(cost).toLocaleString('id-ID')}</span>}
+        {actions}
+      </div>
+      {open && canOpen && <div className="fold-body">{children}</div>}
+    </div>
+  );
+};
+
+// Set id yang sedang terbuka (untuk daftar finishing / biaya lain)
+export function useOpenSet() {
+  const [open, setOpen] = React.useState(() => new Set());
+  const toggle = (id) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const add = (id) => setOpen((s) => new Set(s).add(id));
+  return { has: (id) => open.has(id), toggle, add };
+}
+
 const cm = (n) => fmtNum(n, Number.isInteger(n) ? 0 : 1);
 
 // Gambar satu lembar (plano atau lembar cetak) berisi blok-blok potongan.
-const SheetSvg = ({ w, h, blocks, offsetX = 0, offsetY = 0, grip = 0, maxH = 260, label }) => {
+const SheetSvg = ({ w, h, blocks, offsetX = 0, offsetY = 0, grip = 0, gripSide = 'bottom', maxH = 260, label }) => {
   if (!(w > 0 && h > 0)) return null;
   const pad = Math.max(w, h) * 0.02;
   const cells = [];
@@ -44,7 +71,9 @@ const SheetSvg = ({ w, h, blocks, offsetX = 0, offsetY = 0, grip = 0, maxH = 260
     <figure className="sheet-fig">
       <svg viewBox={`${-pad} ${-pad} ${w + pad * 2} ${h + pad * 2}`} style={{ maxHeight: maxH, width: '100%' }} role="img" aria-label={label}>
         <rect x={0} y={0} width={w} height={h} fill="var(--surface-2)" stroke="var(--border-strong)" strokeWidth="1" vectorEffect="non-scaling-stroke" rx={Math.max(w, h) * 0.006} />
-        {grip > 0 && <rect x={0} y={h - grip} width={w} height={grip} fill="url(#grip)" />}
+        {grip > 0 && (gripSide === 'left'
+          ? <rect x={0} y={0} width={grip} height={h} fill="url(#grip)" />
+          : <rect x={0} y={h - grip} width={w} height={grip} fill="url(#grip)" />)}
         <defs>
           <pattern id="grip" width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="1.2" stroke="var(--border-strong)" strokeWidth="0.4" />
@@ -72,7 +101,7 @@ export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
   // kartu pilihan: satu per jumlah naik + ukuran lembar, ambil yang termurah, urut dari naik terkecil
   const byKey = new Map();
   for (const o of opts) {
-    const k = `${o.up}|${o.sheetW}x${o.sheetH}`;
+    const k = `${o.up}|${Math.min(o.sheetW, o.sheetH)}x${Math.max(o.sheetW, o.sheetH)}`; // lembar sama walau diputar
     if (!byKey.has(k) || o.cost < byKey.get(k).cost) byKey.set(k, o);
   }
   const cards = [...byKey.values()].sort((a, b) => a.up - b.up || a.cost - b.cost);
@@ -93,7 +122,7 @@ export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
         ) : <div className="hint-box">Pilih kertas yang punya ukuran plano.</div>}
         <SheetSvg w={m.layout.sheetW} h={m.layout.sheetH} blocks={m.layout.blocks}
           offsetX={m.layout.offsetX} offsetY={m.layout.offsetY}
-          grip={hasMachine ? Number(m.machine.marginGrip) || 0 : 0} maxH={360}
+          grip={hasMachine ? Number(m.machine.marginGrip) || 0 : 0} gripSide={m.layout.gripSide} maxH={360}
           label={`2 · Lembar cetak ${cm(m.layout.sheetW)} × ${cm(m.layout.sheetH)} isi ${m.up} naik`} />
       </div>
       <div className="legend" style={{ justifyContent: 'center' }}>
@@ -141,8 +170,8 @@ export const MediaLayout = ({ m, index, input, opts, onPick, mediaCost }) => {
 };
 
 // Ringkasan harga di atas halaman
-export const SummaryBar = ({ result, qty }) => (
-  <div className="summary-bar">
+export const SummaryBar = ({ result, qty, invalid }) => (
+  <div className={`summary-bar${invalid ? ' is-invalid' : ''}`}>
     <div className="summary-main">
       <div className="total-label">Harga jual · {fmtNum(qty)} pcs</div>
       <div className="total-val">{fmtRp(result.total)}</div>

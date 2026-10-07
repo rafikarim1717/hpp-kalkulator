@@ -1,8 +1,8 @@
 // Reusable UI primitives
 import React from 'react';
 
-export const Field = ({ label, hint, suffix, children, ...rest }) => (
-  <div className="field" {...rest}>
+export const Field = ({ label, hint, suffix, error, children, ...rest }) => (
+  <div className={`field${error ? ' field-invalid' : ''}`} {...rest}>
     {label && <label className="field-label">{label}</label>}
     {suffix ? (
       <div className="field-with-suffix">
@@ -10,7 +10,7 @@ export const Field = ({ label, hint, suffix, children, ...rest }) => (
         <span className="field-suffix">{suffix}</span>
       </div>
     ) : children}
-    {hint && <div className="field-hint">{hint}</div>}
+    {error ? <div className="field-error" role="alert">{error}</div> : hint && <div className="field-hint">{hint}</div>}
   </div>
 );
 

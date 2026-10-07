@@ -1,7 +1,7 @@
 // Kalkulasi produk offset: ringkasan harga di atas, tiap media = kartu isian lalu section layout selebar halaman,
 // lalu biaya lain + rincian + nego.
 import React from 'react';
-import { CostCard, Check, MediaLayout, NegoCard, NumField, Select, SummaryBar, Warnings } from '../components/calcParts.jsx';
+import { CostCard, Check, Fold, MediaLayout, NegoCard, NumField, Select, SummaryBar, Warnings, useOpenSet } from '../components/calcParts.jsx';
 import { FinishingList, OthersCard } from '../components/editors.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
@@ -16,7 +16,38 @@ export function newOffsetMedia(master) {
   };
 }
 
+// Cek isian ukuran satu media. Hasilnya { w, h } berisi pesan error (kosong = aman).
+export function mediaErrors(m, master) {
+  const e = {};
+  const w = Number(m.w) || 0, h = Number(m.h) || 0;
+  if (w < 0) e.w = 'Tidak boleh minus';
+  else if (w === 0) e.w = 'Wajib diisi';
+  if (h < 0) e.h = 'Tidak boleh minus';
+  else if (h === 0) e.h = 'Wajib diisi';
+  const mc = m.machine && master.machines.find((x) => x.id === m.machine.machineId);
+  if (mc && w > 0 && h > 0) {
+    const b = m.machine.bleed ? 2 * (Number(master.settings.bleed) || 0) : 0;
+    const iw = w + b, ih = h + b, pw = Number(mc.printW) || 0, ph = Number(mc.printH) || 0;
+    const fits = (iw <= pw && ih <= ph) || (iw <= ph && ih <= pw);
+    if (pw > 0 && ph > 0 && !fits) e.w = e.h = `Terlalu besar untuk ${mc.name} (area cetak maks ${pw} × ${ph} cm)`;
+  }
+  if (Number(m.perPcs) < 0) e.perPcs = 'Tidak boleh minus';
+  return e;
+}
+
+function machineSummary(m, master) {
+  if (!m.machine) return 'Tidak dicetak (kertas dipotong saja)';
+  const mc = master.machines.find((x) => x.id === m.machine.machineId);
+  const x = m.machine;
+  const parts = [mc?.name || 'Pilih mesin', `${Number(x.front) || 0}/${x.twoSides ? Number(x.back) || 0 : 0} warna`];
+  if (x.twoSides && Number(x.special) > 0) parts.push(`+${x.special} khusus`);
+  if (x.twoSides && x.samePlate) parts.push('plat sama');
+  if (x.bleed) parts.push('bleed');
+  return parts.join(' · ');
+}
+
 const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) => {
+  const openSet = useOpenSet();
   const result = React.useMemo(() => calcOffset(product, master), [product, master]);
   const set = (patch) => setProduct({ ...product, ...patch });
   const setMedia = (id, patch) => set({ media: product.media.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
@@ -32,6 +63,8 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
     });
   };
 
+  const errs = product.media.map((m) => mediaErrors(m, master));
+  const invalid = Number(product.qty) <= 0 || errs.some((e) => Object.keys(e).length > 0);
   const warnings = result.media.flatMap((m, i) => m.warnings.map((w) => (product.media.length > 1 ? `Media ${i + 1}: ${w}` : w)));
   const otherCosts = Object.fromEntries(result.others.map((o) => [o.id, o.cost]));
 
@@ -46,14 +79,19 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
       </div>
 
       <div className="stack">
-        <SummaryBar result={result} qty={product.qty} />
+        {invalid && (
+          <div className="invalid-box" role="alert">
+            <strong>Harga belum bisa dipakai.</strong> Ada isian yang belum benar (ditandai merah). Perbaiki dulu supaya hitungannya tidak menyesatkan.
+          </div>
+        )}
+        <SummaryBar result={result} qty={product.qty} invalid={invalid} />
         <Warnings list={warnings} />
 
         <div className="card">
           <div className="section-eyebrow" style={{ marginBottom: 12 }}>Produk</div>
           <div className="grid-2">
             <Field label="Nama produk"><input type="text" value={product.name} onChange={(e) => set({ name: e.target.value })} placeholder="mis. Brosur A5" /></Field>
-            <NumField label="Jumlah" suffix="pcs" value={product.qty} onChange={(v) => set({ qty: v })} />
+            <NumField label="Jumlah" suffix="pcs" value={product.qty} onChange={(v) => set({ qty: v })} error={Number(product.qty) <= 0 ? 'Wajib diisi' : null} />
           </div>
         </div>
 
@@ -74,22 +112,23 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                   <div className="grid-auto">
                     <Select label="Kertas" value={m.paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
                       options={master.papers.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
-                    <NumField label="Lembar per pcs" suffix="×" value={m.perPcs} onChange={(v) => setMedia(m.id, { perPcs: v })}
-                      hint="Kalender 13 lembar = 13" />
-                    <NumField label="Desain berbeda" suffix="desain" value={m.designs || 1} onChange={(v) => setMedia(m.id, { designs: v })}
-                      hint="Tiap bulan beda = 13. Sama semua = 1" />
-                    <NumField label="Lebar hasil jadi" suffix="cm" value={m.w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })} />
-                    <NumField label="Tinggi hasil jadi" suffix="cm" value={m.h} onChange={(v) => setMedia(m.id, { h: v, layoutKey: null })} />
+                    <NumField label="Jumlah halaman" suffix="hlm" value={m.perPcs} error={errs[i].perPcs}
+                      onChange={(v) => setMedia(m.id, (m.designs || 1) === (m.perPcs || 1) ? { perPcs: v, designs: v } : { perPcs: v })}
+                      hint="Brosur = 1 · Kalender 13 bulan = 13" />
+                    {Number(m.perPcs) > 1 && (
+                      <NumField label="Halaman yang desainnya beda" suffix="hlm" value={m.designs || 1} onChange={(v) => setMedia(m.id, { designs: v })}
+                        hint={`Dari ${m.perPcs} halaman. Beda semua = ${m.perPcs}, sama semua = 1`} />
+                    )}
+                    <NumField label="Lebar hasil jadi" suffix="cm" value={m.w} error={errs[i].w} onChange={(v) => setMedia(m.id, { w: v, layoutKey: null })} />
+                    <NumField label="Tinggi hasil jadi" suffix="cm" value={m.h} error={errs[i].h} onChange={(v) => setMedia(m.id, { h: v, layoutKey: null })} />
                   </div>
 
-                  <div className="sub-card">
-                    <div className="row-between" style={{ marginBottom: m.machine ? 10 : 0 }}>
-                      <span style={{ fontWeight: 600, fontSize: 13.5 }}>Mesin cetak</span>
-                      <Check label="Dicetak" checked={!!m.machine} onChange={(v) => setMedia(m.id, {
-                        machine: v ? { machineId: master.machines[0]?.id || '', bleed: false, twoSides: false, front: 4, back: 0, special: 0, samePlate: false } : null,
-                        layoutKey: null,
-                      })} />
-                    </div>
+                  <Fold title="Mesin cetak" open={openSet.has(m.id)} onToggle={() => openSet.toggle(m.id)}
+                    summary={machineSummary(m, master)}
+                    actions={<Check label="Dicetak" checked={!!m.machine} onChange={(v) => setMedia(m.id, {
+                      machine: v ? { machineId: master.machines[0]?.id || '', bleed: false, twoSides: false, front: 4, back: 0, special: 0, samePlate: false } : null,
+                      layoutKey: null,
+                    })} />}>
                     {m.machine && (
                       <div className="stack" style={{ gap: 10 }}>
                         <div className="grid-4">
@@ -108,7 +147,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                         </div>
                       </div>
                     )}
-                  </div>
+                  </Fold>
 
                   <FinishingList items={m.finishings} fset={master.finishing}
                     costs={r?.finItems.map((f) => f.cost)}

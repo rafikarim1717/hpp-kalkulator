@@ -28,18 +28,34 @@ function usedOf(blocks) {
 }
 
 // Ubah susunan item jadi ukuran lembar cetak: area terpakai + margin, minimal sebesar media minimum mesin.
-function toSheet(arr, machine) {
-  const w = Math.max(arr.usedW + num(machine.marginSide), num(machine.minW));
-  const h = Math.max(arr.usedH + num(machine.marginGrip), num(machine.minH));
+// gripLong = true: gripper selalu di sisi panjang lembar (kertas masuk mesin dari sisi panjang).
+// gripLong = false: cara app Android, gripper selalu di sisi "tinggi" (bawah gambar).
+function toSheet(arr, machine, gripLong = true) {
+  const side = num(machine.marginSide), grip = num(machine.marginGrip);
+  const portrait = gripLong && arr.usedH > arr.usedW;
+  if (portrait) {
+    // sisi panjang = tinggi → gripper di kiri, margin gripper menambah lebar
+    const minShort = Math.min(num(machine.minW), num(machine.minH)), minLong = Math.max(num(machine.minW), num(machine.minH));
+    const w = Math.max(arr.usedW + grip, minShort);
+    const h = Math.max(arr.usedH + side, minLong);
+    return {
+      ...arr, up: arr.count, sheetW: round2(w), sheetH: round2(h), gripSide: 'left',
+      offsetX: round2(grip + Math.max(0, w - arr.usedW - grip) / 2), offsetY: round2((h - arr.usedH) / 2),
+    };
+  }
+  const minW = gripLong ? Math.max(num(machine.minW), num(machine.minH)) : num(machine.minW);
+  const minH = gripLong ? Math.min(num(machine.minW), num(machine.minH)) : num(machine.minH);
+  const w = Math.max(arr.usedW + side, minW);
+  const h = Math.max(arr.usedH + grip, minH);
   return {
-    ...arr, up: arr.count, sheetW: round2(w), sheetH: round2(h),
+    ...arr, up: arr.count, sheetW: round2(w), sheetH: round2(h), gripSide: 'bottom',
     // posisi blok relatif ke lembar cetak (margin samping dibagi dua, gripper di bawah)
-    offsetX: round2((w - arr.usedW) / 2), offsetY: round2(Math.max(0, h - arr.usedH - num(machine.marginGrip)) / 2),
+    offsetX: round2((w - arr.usedW) / 2), offsetY: round2(Math.max(0, h - arr.usedH - grip) / 2),
   };
 }
 
 // Semua pilihan susunan yang masuk area cetak mesin.
-export function layoutOptions(iw, ih, machine) {
+export function layoutOptions(iw, ih, machine, gripLong = true) {
   const pw = num(machine.printW), ph = num(machine.printH);
   const opts = [];
   const seen = new Set();
@@ -52,7 +68,7 @@ export function layoutOptions(iw, ih, machine) {
         const key = `${rotated ? 'L' : 'P'}${c}x${r}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        opts.push({ key, ...toSheet(gridBlocks(iw, ih, c, r, rotated), machine) });
+        opts.push({ key, ...toSheet(gridBlocks(iw, ih, c, r, rotated), machine, gripLong) });
       }
     }
   }
@@ -60,7 +76,7 @@ export function layoutOptions(iw, ih, machine) {
   const best = calcImposition(pw, ph, iw, ih, 0, 0, 0, 0, 'best');
   if (best.mixed && best.count > 0) {
     const arr = { blocks: best.blocks, count: best.count, ...usedOf(best.blocks) };
-    opts.push({ key: 'mixed', mixed: true, ...toSheet(arr, machine) });
+    opts.push({ key: 'mixed', mixed: true, ...toSheet(arr, machine, gripLong) });
   }
   return opts;
 }
@@ -89,9 +105,9 @@ function referenceLayout(iw, ih, machine, finishings, fset) {
   const pw = num(machine.printW), ph = num(machine.printH);
   const best = calcImposition(pw, ph, iw, ih, 0, 0, 0, 0, 'best');
   let arr;
-  if (best.count > 0) arr = toSheet({ blocks: best.blocks, count: best.count, ...usedOf(best.blocks) }, machine);
+  if (best.count > 0) arr = toSheet({ blocks: best.blocks, count: best.count, ...usedOf(best.blocks) }, machine, false);
   if (!arr || finishingLimits(arr.sheetW, arr.sheetH, finishings, fset).length) {
-    arr = toSheet(gridBlocks(iw, ih, 1, 1, false), machine);
+    arr = toSheet(gridBlocks(iw, ih, 1, 1, false), machine, false);
   }
   return arr;
 }
@@ -139,13 +155,15 @@ function calcFinishing(f, s, ctx) {
   if (!s) return out;
   switch (f.type) {
     case 'laminating': {
+      // ukuran laminasi: isian manual kalau diisi, kalau tidak = hasil jadi + bleed laminasi
+      const custom = num(f.lamW) > 0 && num(f.lamH) > 0;
       const b = num(s.bleed);
-      const lw = w + 2 * b, lh = h + 2 * b;
+      const lw = custom ? num(f.lamW) : w + 2 * b, lh = custom ? num(f.lamH) : h + 2 * b;
       out.size = `${round2(lw)} × ${round2(lh)}`;
       const side = (typeName, which) => {
         const t = (s.types || []).find((x) => x.name === typeName) || (s.types || [])[0];
         if (!t) return;
-        add(`${which}: ${t.name} · ${printSheets} lbr`, atLeast(t.min, pcs * lw * lh * num(t.rate)));
+        add(`${which}: ${t.name} · ${round2(lw)} × ${round2(lh)} cm${custom ? ' (manual)' : ''}`, atLeast(t.min, pcs * lw * lh * num(t.rate)));
       };
       side(f.front, 'Depan');
       if (f.twoSides) side(f.back || f.front, 'Belakang');
@@ -256,14 +274,15 @@ export function calcOffsetMedia(media, product, master) {
   let arr;
   let options = [];
   if (machine && iw > 0 && ih > 0) {
-    options = layoutOptions(iw, ih, machine).map((o) => ({ ...o, problems: finishingLimits(o.sheetW, o.sheetH, finishings, fset) }));
+    const refMode = master.settings?.autoLayout === 'reference';
+    options = layoutOptions(iw, ih, machine, !refMode).map((o) => ({ ...o, problems: finishingLimits(o.sheetW, o.sheetH, finishings, fset) }));
     const picked = media.layoutKey && options.find((o) => o.key === media.layoutKey);
     if (picked) arr = picked;
-    else if (master.settings?.autoLayout === 'reference') arr = referenceLayout(iw, ih, machine, finishings, fset);
+    else if (refMode) arr = referenceLayout(iw, ih, machine, finishings, fset);
     else {
       // otomatis: susunan termurah yang masih muat di semua mesin finishing
       const best = cheapestOption(options, media, product, master);
-      arr = best || referenceLayout(iw, ih, machine, finishings, fset);
+      arr = best || toSheet(gridBlocks(iw, ih, 1, 1, false), machine, true);
     }
     if (picked && picked.problems.length) warnings.push(`Lembar ${picked.sheetW} × ${picked.sheetH} terlalu besar untuk ${picked.problems.join(', ')}.`);
     if (iw > num(machine.printW) && iw > num(machine.printH)) warnings.push(`Ukuran ${w} × ${h} lebih besar dari area cetak ${machine.name}.`);

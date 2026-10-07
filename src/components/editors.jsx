@@ -1,7 +1,7 @@
 // Editor finishing & biaya lain di halaman kalkulasi (dipakai offset dan digital).
 import React from 'react';
 import { FINISHING_TYPES, newId } from '../lib/masterData.js';
-import { Check, NumField, Select } from './calcParts.jsx';
+import { Check, Fold, NumField, Select, useOpenSet } from './calcParts.jsx';
 import { Icon } from './Icon.jsx';
 
 const LABEL = Object.fromEntries(FINISHING_TYPES.map((t) => [t.value, t.label]));
@@ -21,28 +21,39 @@ export function newFinishing(type, fset) {
   }
 }
 
+// Ringkasan satu baris tiap finishing (tampil saat bagiannya tertutup)
+export function finishingSummary(f) {
+  const n = (v) => Number(v) || 0;
+  switch (f.type) {
+    case 'laminating': return `${f.front || ''}${f.twoSides ? ` · 2 sisi${f.back && f.back !== f.front ? ` (${f.back})` : ''}` : ''}${n(f.lamW) > 0 && n(f.lamH) > 0 ? ` · ${n(f.lamW)} × ${n(f.lamH)} cm` : ''}`;
+    case 'varnish': case 'spotuv': return `${n(f.sides) || 1} sisi`;
+    case 'pond': return `Pisau ${f.template || ''}${f.includeTemplate ? '' : ' (pisau sudah ada)'}${n(f.knifeLength) > 0 ? ` · ${n(f.knifeLength)} cm` : ''}`;
+    case 'folding': return `${n(f.folds) || 1} lipatan`;
+    case 'poly': return f.formula === 'second' ? `${(f.spots || []).length} spot` : `${n(f.w)} × ${n(f.h)} cm`;
+    case 'emboss': return f.includeTemplate ? 'termasuk klise' : '';
+    case 'spiral': return `${f.spiralType || ''} · ${n(f.long)} cm`;
+    default: return '';
+  }
+}
+
 export const FinishingList = ({ items, onChange, fset, costs }) => {
   const [adding, setAdding] = React.useState('');
+  const open = useOpenSet();
   const upd = (id, patch) => onChange(items.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const del = (id) => onChange(items.filter((f) => f.id !== id));
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="field-label">Finishing</div>
       {items.map((f, k) => (
-        <div key={f.id} className="sub-card">
-          <div className="row-between" style={{ marginBottom: 10 }}>
-            <span style={{ fontWeight: 600, fontSize: 13.5 }}>{LABEL[f.type] || f.type}</span>
-            <span className="row" style={{ gap: 6 }}>
-              {costs?.[k] != null && <span className="mono" style={{ fontSize: 12.5 }}>{Math.round(costs[k]).toLocaleString('id-ID')}</span>}
-              <button className="btn btn-ghost btn-icon" aria-label={`Hapus ${LABEL[f.type]}`} onClick={() => del(f.id)}><Icon.X style={{ width: 13, height: 13 }} /></button>
-            </span>
-          </div>
+        <Fold key={f.id} title={LABEL[f.type] || f.type} summary={finishingSummary(f)} cost={costs?.[k]}
+          open={open.has(f.id)} onToggle={() => open.toggle(f.id)}
+          actions={<button className="btn btn-ghost btn-icon" aria-label={`Hapus ${LABEL[f.type]}`} onClick={() => del(f.id)}><Icon.X style={{ width: 13, height: 13 }} /></button>}>
           <FinishingFields f={f} s={fset[f.type] || {}} upd={(p) => upd(f.id, p)} />
-        </div>
+        </Fold>
       ))}
       <select value={adding} aria-label="Tambah finishing" onChange={(e) => {
         const t = e.target.value;
-        if (t) onChange([...items, newFinishing(t, fset)]);
+        if (t) { const nf = newFinishing(t, fset); onChange([...items, nf]); open.add(nf.id); }
         setAdding('');
       }}>
         <option value="">+ Tambah finishing…</option>
@@ -58,10 +69,16 @@ function FinishingFields({ f, s, upd }) {
   switch (f.type) {
     case 'laminating':
       return (
-        <div className="grid-3">
-          <Select label="Depan" value={f.front} onChange={(v) => upd({ front: v })} options={opt(s.types)} />
-          <div className="field" style={{ justifyContent: 'flex-end' }}><Check label="2 sisi" checked={f.twoSides} onChange={(v) => upd({ twoSides: v })} /></div>
-          {f.twoSides && <Select label="Belakang" value={f.back} onChange={(v) => upd({ back: v })} options={opt(s.types)} />}
+        <div className="stack" style={{ gap: 10 }}>
+          <div className="grid-3" style={{ alignItems: 'end' }}>
+            <Select label="Depan" value={f.front} onChange={(v) => upd({ front: v })} options={opt(s.types)} />
+            {f.twoSides ? <Select label="Belakang" value={f.back} onChange={(v) => upd({ back: v })} options={opt(s.types)} /> : <span />}
+            <div className="field" style={{ justifyContent: 'flex-end', paddingBottom: 10 }}><Check label="2 sisi" checked={f.twoSides} onChange={(v) => upd({ twoSides: v })} /></div>
+          </div>
+          <div className="grid-3">
+            <NumField label="Lebar laminasi (custom)" suffix="cm" value={f.lamW || 0} onChange={(v) => upd({ lamW: v })} hint="0 = ikut ukuran hasil jadi" />
+            <NumField label="Tinggi laminasi (custom)" suffix="cm" value={f.lamH || 0} onChange={(v) => upd({ lamH: v })} />
+          </div>
         </div>
       );
     case 'varnish': case 'spotuv':
@@ -121,6 +138,7 @@ function FinishingFields({ f, s, upd }) {
 
 export const OthersCard = ({ items, onChange, defs, costs }) => {
   const [adding, setAdding] = React.useState('');
+  const open = useOpenSet();
   const upd = (id, patch) => onChange(items.map((o) => (o.id === id ? { ...o, ...patch } : o)));
   return (
     <div className="card">
@@ -130,30 +148,25 @@ export const OthersCard = ({ items, onChange, defs, costs }) => {
         {items.map((o) => {
           const d = defs.find((x) => x.id === o.otherId);
           return (
-            <div key={o.id} className="sub-card">
-              <div className="row-between" style={{ marginBottom: d && (d.by === 'area' || d.by === 'sheet') ? 10 : 0 }}>
-                <span style={{ fontWeight: 600, fontSize: 13.5 }}>{d?.name || '(dihapus dari data master)'}</span>
-                <span className="row" style={{ gap: 6 }}>
-                  {costs?.[o.id] != null && <span className="mono" style={{ fontSize: 12.5 }}>{Math.round(costs[o.id]).toLocaleString('id-ID')}</span>}
-                  <button className="btn btn-ghost btn-icon" aria-label="Hapus biaya" onClick={() => onChange(items.filter((x) => x.id !== o.id))}><Icon.X style={{ width: 13, height: 13 }} /></button>
-                </span>
-              </div>
-              {d?.by === 'area' && (
+            <Fold key={o.id} title={d?.name || '(dihapus dari data master)'} cost={costs?.[o.id]}
+              summary={d?.by === 'area' ? `${o.w || 0} × ${o.h || 0} cm × ${o.multiply || 1}` : d?.by === 'sheet' ? `${o.sheets || 0} lembar` : ''}
+              open={open.has(o.id)} onToggle={() => open.toggle(o.id)}
+              actions={<button className="btn btn-ghost btn-icon" aria-label="Hapus biaya" onClick={() => onChange(items.filter((x) => x.id !== o.id))}><Icon.X style={{ width: 13, height: 13 }} /></button>}>
+              {d?.by === 'area' ? (
                 <div className="grid-3">
                   <NumField label="Lebar" suffix="cm" value={o.w} onChange={(v) => upd(o.id, { w: v })} />
                   <NumField label="Tinggi" suffix="cm" value={o.h} onChange={(v) => upd(o.id, { h: v })} />
                   <NumField label="Kali" suffix="×" value={o.multiply} onChange={(v) => upd(o.id, { multiply: v })} />
                 </div>
-              )}
-              {d?.by === 'sheet' && (
+              ) : d?.by === 'sheet' ? (
                 <div className="grid-3"><NumField label="Jumlah lembar" suffix="lbr" value={o.sheets} onChange={(v) => upd(o.id, { sheets: v })} /></div>
-              )}
-            </div>
+              ) : null}
+            </Fold>
           );
         })}
         <select value={adding} aria-label="Tambah biaya lain" onChange={(e) => {
           const id = e.target.value;
-          if (id) onChange([...items, { id: newId('o'), otherId: id, w: 0, h: 0, multiply: 1, sheets: 0 }]);
+          if (id) { const no = { id: newId('o'), otherId: id, w: 0, h: 0, multiply: 1, sheets: 0 }; onChange([...items, no]); open.add(no.id); }
           setAdding('');
         }}>
           <option value="">+ Tambah biaya lain…</option>
