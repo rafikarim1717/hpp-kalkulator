@@ -1,19 +1,23 @@
 // App root
+//   Tanpa env Supabase  → mode lokal: login demo, data di browser (seperti sebelumnya)
+//   Dengan env Supabase → login akun, data per percetakan di database, multi-user
 import React from 'react';
 import { Icon } from './components/Icon.jsx';
 import Login from './components/Login.jsx';
+import AuthScreen, { Onboarding } from './components/AuthScreen.jsx';
 import { TweakRadio, TweakSection, TweakSlider, TweaksPanel, useTweaks } from './components/TweaksPanel.jsx';
 import { useLocalState } from './hooks/useLocalState.js';
-import {
-  DEFAULT_DIGITAL_MACHINES, DEFAULT_DIGITAL_PAPERS, DEFAULT_FINISHING, DEFAULT_MACHINES,
-  DEFAULT_OTHERS, DEFAULT_PAPERS, DEFAULT_SETTINGS, SAMPLE_BROSUR, newId,
-} from './lib/masterData.js';
+import { useLocalWorkspace, useRemoteWorkspace } from './hooks/useWorkspace.js';
+import { captureInviteFromUrl, useMembership, useSession } from './hooks/useAccount.js';
+import { supabase, friendlyError } from './lib/supabase.js';
+import { newId } from './lib/masterData.js';
 import DigitalCalcPage, { newDigitalItem } from './pages/DigitalCalcPage.jsx';
 import {
   DigitalMasterPage, FinishingPage, MachinesPage, OthersPage, PapersPage, SettingsPage,
 } from './pages/MasterPages.jsx';
 import OffsetCalcPage, { newOffsetMedia } from './pages/OffsetCalcPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
+import AccountPage from './pages/AccountPage.jsx';
 import { productFromTemplate } from './lib/templates.js';
 
 const TWEAK_DEFAULTS = {
@@ -33,35 +37,13 @@ const NAV = [
   { id: 'digital-master', label: 'Digital', icon: Icon.Grid, group: 'Data Master' },
   { id: 'settings', label: 'Pengaturan umum', icon: Icon.Clock, group: 'Pengaturan' },
 ];
+const ACCOUNT_NAV = { id: 'account', label: 'Akun & Tim', icon: Icon.Users, group: 'Pengaturan' };
 
-const App = () => {
-  const [user, setUser] = useLocalState('pl_user', null);
-  const [page, setPage] = useLocalState('pl2_page', 'offset');
-  const [openId, setOpenId] = useLocalState('pl2_open', null);
-  const [settings, setSettings] = useLocalState('pl2_settings', DEFAULT_SETTINGS);
-  const [papers, setPapers] = useLocalState('pl2_papers', DEFAULT_PAPERS);
-  const [machines, setMachines] = useLocalState('pl2_machines', DEFAULT_MACHINES);
-  const [finishing, setFinishing] = useLocalState('pl2_finishing', DEFAULT_FINISHING, (f) => ({ ...DEFAULT_FINISHING, ...f }));
-  const [others, setOthers] = useLocalState('pl2_others', DEFAULT_OTHERS);
-  const [digitalPapers, setDigitalPapers] = useLocalState('pl2_dpapers', DEFAULT_DIGITAL_PAPERS);
-  const [digitalMachines, setDigitalMachines] = useLocalState('pl2_dmachines', DEFAULT_DIGITAL_MACHINES);
-  const [products, setProducts] = useLocalState('pl2_products', [SAMPLE_BROSUR]);
-  const master = React.useMemo(() => ({
-    settings, papers, machines, finishing, others, digitalPapers, digitalMachines,
-  }), [settings, papers, machines, finishing, others, digitalPapers, digitalMachines]);
-  const [mobileNav, setMobileNav] = React.useState(false);
-  const [tweaksOpen, setTweaksOpen] = React.useState(false);
+// ── Tampilan (tema, kepadatan, font) ───────────────────────────────────────
 
+function useAppearance() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const mainRef = React.useRef(null);
-
-  // Mulai dari atas tiap pindah halaman (supaya banner/peringatan di atas kelihatan)
-  React.useEffect(() => {
-    window.scrollTo(0, 0);
-    if (mainRef.current) mainRef.current.scrollTop = 0;
-  }, [page, openId]);
-
-  // Apply tweaks to body
+  const [open, setOpen] = React.useState(false);
   React.useEffect(() => {
     document.body.dataset.theme = tweaks.theme;
     document.body.dataset.density = tweaks.density;
@@ -71,69 +53,89 @@ const App = () => {
     document.documentElement.style.setProperty('--accent-strong', `oklch(0.42 0.20 ${tweaks.accent_hue})`);
     document.documentElement.style.setProperty('--accent-text', `oklch(0.42 0.20 ${tweaks.accent_hue})`);
   }, [tweaks.theme, tweaks.density, tweaks.font, tweaks.accent_hue]);
-
-  const tweaksPanel = (
-    <TweaksPanel title="Tampilan" open={tweaksOpen} onClose={() => setTweaksOpen(false)}>
+  const panel = (
+    <TweaksPanel title="Tampilan" open={open} onClose={() => setOpen(false)}>
       {renderTweaksContent(tweaks, setTweak)}
     </TweaksPanel>
   );
+  return { panel, open: () => setOpen(true), toggle: () => setOpen((o) => !o) };
+}
 
-  if (!user) return <>
-    <Login onLogin={setUser} onOpenTweaks={() => setTweaksOpen(true)} />
-    {tweaksPanel}
-  </>;
+// ── Status simpan ─────────────────────────────────────────────────────────
+
+const SavePill = ({ save, readOnly, onRetry }) => {
+  if (readOnly) return <span className="save-pill">Hanya lihat</span>;
+  if (save.state === 'error') {
+    return <button className="save-pill error" onClick={onRetry} title={friendlyError(save.error)}>Gagal menyimpan · coba lagi</button>;
+  }
+  const label = { saved: 'Tersimpan', pending: 'Belum tersimpan…', saving: 'Menyimpan…' }[save.state] || '';
+  return <span className="save-pill" aria-live="polite">{label}</span>;
+};
+
+const Center = ({ children }) => <div className="center-screen"><div>{children}</div></div>;
+
+// ── Kerangka aplikasi (sama untuk mode lokal & Supabase) ───────────────────
+
+const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, savePill }) => {
+  const [page, setPage] = useLocalState('pl2_page', 'offset');
+  const [openId, setOpenId] = useLocalState('pl2_open', null);
+  const [mobileNav, setMobileNav] = React.useState(false);
+  const mainRef = React.useRef(null);
+  const { master, products, setProducts, setMaster } = workspace;
+
+  // Mulai dari atas tiap pindah halaman (supaya banner/peringatan di atas kelihatan)
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [page, openId]);
+
+  const nav = account ? [...NAV, ACCOUNT_NAV] : NAV;
+  const current = nav.some((n) => n.id === page) ? page : 'offset';
 
   const openProduct = products.find((p) => p.id === openId);
-  const setProduct = (next) => setProducts(products.map((p) => (p.id === next.id ? next : p)));
-  const newProduct = (kind) => {
-    const p = kind === 'offset'
-      ? { id: newId('p'), kind, name: '', qty: 1000, media: [newOffsetMedia(master)], others: [] }
-      : { id: newId('p'), kind, name: '', qty: 100, items: [newDigitalItem(master)], others: [] };
-    setProducts([...products, p]);
-    setOpenId(p.id);
-  };
-  const fromTemplate = (tpl) => {
-    const p = productFromTemplate(tpl, master);
-    setProducts([...products, p]);
-    setOpenId(p.id);
-  };
+  const setProduct = (next) => setProducts((list) => list.map((p) => (p.id === next.id ? next : p)));
+  const addAndOpen = (p) => { setProducts((list) => [...list, p]); setOpenId(p.id); };
+  const newProduct = (kind) => addAndOpen(kind === 'offset'
+    ? { id: newId('p'), kind, name: '', qty: 1000, media: [newOffsetMedia(master)], others: [] }
+    : { id: newId('p'), kind, name: '', qty: 100, items: [newDigitalItem(master)], others: [] });
+  const fromTemplate = (tpl) => addAndOpen(productFromTemplate(tpl, master));
   const duplicate = (id) => {
     const src = products.find((p) => p.id === id);
     if (!src) return;
-    const copy = { ...JSON.parse(JSON.stringify(src)), id: newId('p'), name: `${src.name || 'Produk'} (salinan)` };
-    setProducts([...products, copy]);
-    setOpenId(copy.id);
+    addAndOpen({ ...JSON.parse(JSON.stringify(src)), id: newId('p'), name: `${src.name || 'Produk'} (salinan)` });
   };
-  const remove = (id) => { setProducts(products.filter((p) => p.id !== id)); if (openId === id) setOpenId(null); };
+  const remove = (id) => { setProducts((list) => list.filter((p) => p.id !== id)); if (openId === id) setOpenId(null); };
+  const setter = (key) => (v) => setMaster(key, v);
 
   const renderPage = () => {
-    switch (page) {
+    switch (current) {
       case 'offset': case 'digital': {
-        if (openProduct && openProduct.kind === page) {
-          const Calc = page === 'offset' ? OffsetCalcPage : DigitalCalcPage;
+        if (openProduct && openProduct.kind === current) {
+          const Calc = current === 'offset' ? OffsetCalcPage : DigitalCalcPage;
           return <Calc key={openProduct.id} product={openProduct} setProduct={setProduct} master={master}
             onBack={() => setOpenId(null)} onDuplicate={() => duplicate(openProduct.id)} />;
         }
-        return <ProductsPage kind={page} products={products} master={master} onOpen={setOpenId}
-          onNew={() => newProduct(page)} onFromTemplate={fromTemplate} onDuplicate={duplicate} onDelete={remove} />;
+        return <ProductsPage kind={current} products={products} master={master} onOpen={setOpenId}
+          onNew={() => newProduct(current)} onFromTemplate={fromTemplate} onDuplicate={duplicate} onDelete={remove} />;
       }
-      case 'paper': return <PapersPage papers={papers} setPapers={setPapers} />;
-      case 'machine': return <MachinesPage machines={machines} setMachines={setMachines} />;
-      case 'finishing': return <FinishingPage finishing={finishing} setFinishing={setFinishing} />;
-      case 'other': return <OthersPage others={others} setOthers={setOthers} />;
-      case 'digital-master': return <DigitalMasterPage papers={digitalPapers} setPapers={setDigitalPapers} machines={digitalMachines} setMachines={setDigitalMachines} />;
-      case 'settings': return <SettingsPage settings={settings} setSettings={setSettings} />;
+      case 'paper': return <PapersPage papers={master.papers} setPapers={setter('papers')} />;
+      case 'machine': return <MachinesPage machines={master.machines} setMachines={setter('machines')} />;
+      case 'finishing': return <FinishingPage finishing={master.finishing} setFinishing={setter('finishing')} />;
+      case 'other': return <OthersPage others={master.others} setOthers={setter('others')} />;
+      case 'digital-master': return <DigitalMasterPage papers={master.digitalPapers} setPapers={setter('digitalPapers')} machines={master.digitalMachines} setMachines={setter('digitalMachines')} />;
+      case 'settings': return <SettingsPage settings={master.settings} setSettings={setter('settings')} />;
+      case 'account': return account;
       default: return null;
     }
   };
 
   const navByGroup = {};
-  NAV.forEach((n) => { (navByGroup[n.group] = navByGroup[n.group] || []).push(n); });
+  nav.forEach((n) => { (navByGroup[n.group] = navByGroup[n.group] || []).push(n); });
 
   return <>
     <div className="app-shell">
       <div className="topbar">
-        <button className="mobile-menu-btn" onClick={() => setMobileNav(!mobileNav)}>
+        <button className="mobile-menu-btn" onClick={() => setMobileNav(!mobileNav)} aria-label="Menu">
           <Icon.Menu style={{ width: 16, height: 16 }} />
         </button>
         <div className="brand">
@@ -142,13 +144,14 @@ const App = () => {
           <div className="brand-version">v3 beta</div>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className="btn btn-ghost btn-sm btn-tampilan" onClick={() => setTweaksOpen(!tweaksOpen)} title="Pengaturan tampilan" aria-label="Pengaturan tampilan">
+          {savePill}
+          <button className="btn btn-ghost btn-sm btn-tampilan" onClick={appearance.toggle} title="Pengaturan tampilan" aria-label="Pengaturan tampilan">
             <Icon.Gear style={{ width: 16, height: 16 }} />
           </button>
-          <div className="mono" style={{ fontSize: 12, color: 'var(--text-3)', padding: '5px 10px', background: 'var(--surface-2)', borderRadius: 20 }}>
-            {user}
+          <div className="mono user-chip" style={{ fontSize: 12, color: 'var(--text-3)', padding: '5px 10px', background: 'var(--surface-2)', borderRadius: 20 }}>
+            {userLabel}
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => setUser(null)} title="Keluar">
+          <button className="btn btn-ghost btn-sm" onClick={onLogout} title="Keluar" aria-label="Keluar">
             <Icon.Logout style={{ width: 14, height: 14 }} />
           </button>
         </div>
@@ -161,7 +164,7 @@ const App = () => {
             {items.map((n) => {
               const I = n.icon;
               return (
-                <div key={n.id} className={`nav-item ${page === n.id ? 'active' : ''}`}
+                <div key={n.id} className={`nav-item ${current === n.id ? 'active' : ''}`}
                   onClick={(e) => { e.stopPropagation(); setPage(n.id); setOpenId(null); setMobileNav(false); }}>
                   <I className="nav-icon" />
                   <span>{n.label}</span>
@@ -176,13 +179,102 @@ const App = () => {
       </div>
 
       <main className="main" ref={mainRef}>
+        {banner}
         {renderPage()}
       </main>
     </div>
-
-    {tweaksPanel}
+    {appearance.panel}
   </>;
 };
+
+// ── Mode lokal (tanpa Supabase) ───────────────────────────────────────────
+
+const LocalApp = () => {
+  const appearance = useAppearance();
+  const [user, setUser] = useLocalState('pl_user', null);
+  const workspace = useLocalWorkspace();
+  if (!user) return <><Login onLogin={setUser} onOpenTweaks={appearance.open} />{appearance.panel}</>;
+  return <Shell workspace={workspace} appearance={appearance} userLabel={user} onLogout={() => setUser(null)} />;
+};
+
+// ── Mode Supabase ─────────────────────────────────────────────────────────
+
+const signOut = () => supabase.auth.signOut();
+
+const RemoteApp = () => {
+  const appearance = useAppearance();
+  const [initialInvite] = React.useState(() => captureInviteFromUrl());
+  const { session, recovery, endRecovery } = useSession(supabase);
+
+  let screen;
+  if (session === undefined) screen = <Center>Memuat…</Center>;
+  else if (!session || recovery) {
+    screen = <AuthScreen client={supabase} initialInvite={initialInvite} recovery={recovery} onRecoveryDone={endRecovery} />;
+  } else screen = <MemberGate key={session.user.id} session={session} appearance={appearance} initialInvite={initialInvite} />;
+
+  return <>{screen}{!session && appearance.panel}</>;
+};
+
+const MemberGate = ({ session, appearance, initialInvite }) => {
+  const membership = useMembership(supabase, session);
+  if (membership.status === 'loading') return <Center>Memuat percetakan…</Center>;
+  if (membership.status === 'error') {
+    return (
+      <Center>
+        <p>{friendlyError(membership.error)}</p>
+        <div className="row" style={{ gap: 8, justifyContent: 'center', marginTop: 12 }}>
+          <button className="btn btn-primary" onClick={membership.reload}>Coba lagi</button>
+          <button className="btn btn-ghost" onClick={signOut}>Keluar</button>
+        </div>
+      </Center>
+    );
+  }
+  if (membership.status === 'none') {
+    return <Onboarding client={supabase} error={membership.error} onDone={membership.reload} onLogout={signOut} initialInvite={initialInvite} />;
+  }
+  return <RemoteShell key={membership.shop.id} session={session} membership={membership} appearance={appearance} />;
+};
+
+const RemoteShell = ({ session, membership, appearance }) => {
+  const workspace = useRemoteWorkspace(supabase, membership.shop);
+  const { shop } = membership;
+
+  if (workspace.status === 'loading') return <Center>Memuat data {shop.name}…</Center>;
+  if (workspace.status === 'error') {
+    return (
+      <Center>
+        <p>Gagal memuat data: {friendlyError(workspace.loadError)}</p>
+        <div className="row" style={{ gap: 8, justifyContent: 'center', marginTop: 12 }}>
+          <button className="btn btn-primary" onClick={() => window.location.reload()}>Muat ulang</button>
+          <button className="btn btn-ghost" onClick={signOut}>Keluar</button>
+        </div>
+      </Center>
+    );
+  }
+
+  const logout = async () => {
+    await workspace.retry(); // simpan perubahan terakhir dulu
+    signOut();
+  };
+  const banner = !shop.active && (
+    <div className="shop-banner" role="status">
+      Masa aktif <b>{shop.name}</b> sudah berakhir. Data masih bisa dilihat, tapi perubahan tidak disimpan. Hubungi admin Pricelab untuk memperpanjang.
+    </div>
+  );
+  const account = (
+    <AccountPage client={supabase} session={session} membership={membership} workspace={workspace}
+      onShopChanged={membership.reload} onLogout={logout} />
+  );
+
+  return (
+    <Shell workspace={workspace} appearance={appearance}
+      userLabel={membership.displayName || session.user.email}
+      onLogout={logout} account={account} banner={banner}
+      savePill={<SavePill save={workspace.save} readOnly={workspace.readOnly} onRetry={workspace.retry} />} />
+  );
+};
+
+const App = () => (supabase ? <RemoteApp /> : <LocalApp />);
 
 function renderTweaksContent(tweaks, setTweak) {
   return <>
