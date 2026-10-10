@@ -137,7 +137,7 @@ Di menu **Hitung HPP** (sebagian sudah terisi dari langkah A), lengkapi:
 Klik **Simpan Kalkulasi** → tombol berubah jadi "Tersimpan ✓" dan kalkulasi masuk ke **Histori**.
 
 ### Cara membaca angka ini
-- **Plat adalah biaya terbesar (64% HPP).** Untuk order kecil, biaya plat mendominasi. Coba ubah Jumlah Produk Jadi ke 5.000 — HPP/pcs akan turun drastis karena plat dibagi ke lebih banyak pcs. Ini dasar untuk kasih harga bertingkat ke customer.
+- **Plat adalah biaya terbesar (64% HPP).** Untuk order kecil, biaya plat mendominasi. Coba ubah Jumlah Order ke 5.000 — HPP/pcs akan turun drastis karena plat dibagi ke lebih banyak pcs. Ini dasar untuk kasih harga bertingkat ke customer.
 - **Minimum ongkos cetak kena.** 358 lembar ditagih seperti 500 lembar. Kertas tetap dihitung 358 lembar (tidak ikut dibulatkan).
 - **Bolak-balik tidak menggandakan kertas.** Sisi belakang dicetak di lembar yang sama; yang bertambah hanya plat, pass, dan kertas setting.
 
