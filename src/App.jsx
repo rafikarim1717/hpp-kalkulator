@@ -81,6 +81,7 @@ const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, sa
   const [page, setPage] = useLocalState('pl2_page', 'offset');
   const [openId, setOpenId] = useLocalState('pl2_open', null);
   const [mobileNav, setMobileNav] = React.useState(false);
+  const [navTick, setNavTick] = React.useState(0); // klik menu = kembali ke daftar
   const mainRef = React.useRef(null);
   const { master, products, setProducts, setMaster } = workspace;
 
@@ -168,7 +169,7 @@ const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, sa
               const I = n.icon;
               return (
                 <div key={n.id} className={`nav-item ${current === n.id ? 'active' : ''}`}
-                  onClick={(e) => { e.stopPropagation(); setPage(n.id); setOpenId(null); setMobileNav(false); }}>
+                  onClick={(e) => { e.stopPropagation(); setPage(n.id); setOpenId(null); setNavTick((t) => t + 1); setMobileNav(false); }}>
                   <I className="nav-icon" />
                   <span>{n.label}</span>
                 </div>
@@ -180,7 +181,7 @@ const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, sa
 
       <main className="main" ref={mainRef}>
         {banner}
-        {renderPage()}
+        <React.Fragment key={`${current}-${navTick}`}>{renderPage()}</React.Fragment>
       </main>
     </div>
     {appearance.panel}

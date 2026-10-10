@@ -978,3 +978,12 @@ body { font-family: var(--sans); font-size: 15px; font-variant-numeric: tabular-
 @media (max-width: 640px) { .save-pill { display: none; } .save-pill.error { display: inline-block; } }
 .invite-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
 .invite-code { font-weight: 700; letter-spacing: .1em; font-size: 15px; }
+
+/* daftar data master: baris bisa diklik untuk buka detail */
+.list-table th.num, .list-table td.num { text-align: right; }
+.list-table tr.row-link { cursor: pointer; }
+.list-table tr.row-link:focus-visible td { background: var(--surface-2); outline: none; }
+.list-table td.row-chevron { width: 32px; color: var(--text-4); font-size: 18px; text-align: right; }
+@media (max-width: 640px) {
+  .list-table th:nth-child(3), .list-table td:nth-child(3) { display: none; }
+}
