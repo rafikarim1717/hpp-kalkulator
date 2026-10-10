@@ -107,6 +107,8 @@ const ListDetail = ({ items, setItems, header, before, addLabel, newItem, column
   );
 };
 
+const nameErrors = (x) => ({ name: String(x.name || '').trim() ? null : 'Nama wajib diisi' });
+
 const priceRange = (prices) => {
   const v = prices.filter((x) => Number.isFinite(x) && x > 0);
   if (!v.length) return '–';
@@ -282,6 +284,7 @@ export const OthersPage = ({ others, setOthers }) => (
     header={<Header title="Biaya" em="lain" sub="Biaya di luar produksi: transport, lem, design, plastik, jilid, dll." />}
     addLabel="Tambah biaya" backLabel="Daftar biaya lain" removeLabel="Hapus biaya" searchPlaceholder="Cari biaya…" emptyText="Belum ada biaya lain"
     newItem={() => ({ id: newId('o'), name: '', by: 'order', rate: 0, min: 0, perQty: 1 })}
+    errorsOf={nameErrors}
     columns={[
       { label: 'Biaya', render: (o) => <b>{o.name || 'Tanpa nama'}</b> },
       { label: 'Dihitung per', render: (o) => OTHER_BY.find((b) => b.value === o.by)?.label || o.by },
@@ -291,7 +294,7 @@ export const OthersPage = ({ others, setOthers }) => (
     renderDetail={(o, set) => (
       <div className="card">
         <div className="grid-4" style={{ alignItems: 'end' }}>
-          <Field label="Nama"><input type="text" value={o.name} onChange={(e) => set({ name: e.target.value })} /></Field>
+          <Field label="Nama" error={nameErrors(o).name}><input type="text" value={o.name} onChange={(e) => set({ name: e.target.value })} /></Field>
           <Select label="Dihitung per" value={o.by} onChange={(v) => set({ by: v })} options={OTHER_BY} />
           {o.by !== 'order' && o.by !== 'pcs' && <NumField label="Ongkos minimum" suffix="Rp" value={o.min} onChange={(v) => set({ min: v })} />}
           <NumField label="Ongkos" suffix={rateSuffixOf(o.by)} value={o.rate} onChange={(v) => set({ rate: v })} />
@@ -327,7 +330,7 @@ const DigitalPapersCard = ({ papers, setPapers }) => (
 const digitalMachineDetail = (papers) => (m, set) => (
   <div className="card">
     <div className="grid-3" style={{ alignItems: 'end', marginBottom: 14 }}>
-      <Field label="Nama mesin"><input type="text" value={m.name} onChange={(e) => set({ name: e.target.value })} /></Field>
+      <Field label="Nama mesin" error={nameErrors(m).name}><input type="text" value={m.name} onChange={(e) => set({ name: e.target.value })} /></Field>
       <NumField label="Ukuran lebar" suffix="cm" value={m.w} onChange={(v) => set({ w: v })} />
       <NumField label="Ukuran tinggi" suffix="cm" value={m.h} onChange={(v) => set({ h: v })} />
     </div>
@@ -363,6 +366,7 @@ export const DigitalMasterPage = ({ papers, setPapers, machines, setMachines }) 
     header={<Header title="Data" em="digital" sub="Kertas dan mesin digital, dengan harga bertingkat per jumlah lembar." />}
     addLabel="Tambah mesin digital" backLabel="Data digital" removeLabel="Hapus mesin" searchPlaceholder="Cari mesin…" emptyText="Belum ada mesin digital"
     newItem={() => ({ id: newId('dm'), name: '', w: 32, h: 48, prices: [] })}
+    errorsOf={nameErrors}
     before={<DigitalPapersCard papers={papers} setPapers={setPapers} />}
     columns={[
       { label: 'Mesin digital', render: (m) => <b>{m.name || 'Tanpa nama'}</b> },

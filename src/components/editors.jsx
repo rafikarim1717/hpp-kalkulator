@@ -170,7 +170,7 @@ export const OthersCard = ({ items, onChange, defs, costs }) => {
           setAdding('');
         }}>
           <option value="">+ Tambah biaya lain…</option>
-          {defs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {defs.filter((d) => String(d.name || '').trim()).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
     </div>

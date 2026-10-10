@@ -152,7 +152,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
               <div className="stack">
                   <div className="grid-auto">
                     <Select label="Kertas" value={m.paperId} error={errs[i].paperId} onChange={(v) => setMedia(m.id, { paperId: v })}
-                      options={master.papers.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
+                      options={master.papers.map((p) => ({ value: p.id, label: p.name || '(kertas tanpa nama)' }))} placeholder="Pilih kertas" />
                     <NumField label="Jumlah halaman" suffix="hlm" value={m.perPcs} error={errs[i].perPcs}
                       onChange={(v) => setMedia(m.id, (m.designs || 1) === (m.perPcs || 1) ? { perPcs: v, designs: v } : { perPcs: v })}
                       hint="Brosur = 1 · Kalender 13 bulan = 13" />
@@ -187,7 +187,7 @@ const OffsetCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =>
                       <div className="stack" style={{ gap: 10 }}>
                         <div className="grid-4">
                           <Select label="Mesin" value={m.machine.machineId} onChange={(v) => setMachine(m, { machineId: v })}
-                            options={master.machines.map((x) => ({ value: x.id, label: x.name }))} />
+                            options={master.machines.map((x) => ({ value: x.id, label: x.name || '(mesin tanpa nama)' }))} />
                           <NumField label="Warna depan" value={m.machine.front} onChange={(v) => setMachine(m, { front: v })} />
                           {m.machine.twoSides && <NumField label="Warna belakang" value={m.machine.back} onChange={(v) => setMachine(m, { back: v })} />}
                           {m.machine.twoSides && <NumField label="Warna khusus" value={m.machine.special} onChange={(v) => setMachine(m, { special: v })} />}

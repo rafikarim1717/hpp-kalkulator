@@ -59,9 +59,9 @@ const DigitalCalcPage = ({ product, setProduct, master, onBack, onDuplicate }) =
                     <Select label="Mesin" value={it.machineId} onChange={(v) => {
                       const m = master.digitalMachines.find((x) => x.id === v);
                       setItem(it.id, { machineId: v, paperId: m?.prices?.[0]?.paperId || '' });
-                    }} options={master.digitalMachines.map((m) => ({ value: m.id, label: `${m.name} (${m.w} × ${m.h})` }))} />
+                    }} options={master.digitalMachines.map((m) => ({ value: m.id, label: `${m.name || '(mesin tanpa nama)'} (${m.w} × ${m.h})` }))} />
                     <Select label="Kertas (yang ada harganya di mesin ini)" value={it.paperId} onChange={(v) => setItem(it.id, { paperId: v })}
-                      options={paperOpts.map((p) => ({ value: p.id, label: p.name }))} placeholder="Pilih kertas" />
+                      options={paperOpts.map((p) => ({ value: p.id, label: p.name || '(kertas tanpa nama)' }))} placeholder="Pilih kertas" />
                   </div>
                   <div className="grid-4">
                     <NumField label="Lebar" suffix="cm" value={it.w} onChange={(v) => setItem(it.id, { w: v })} />
