@@ -54,8 +54,7 @@ const ProductsPage = ({ kind, products, master, onOpen, onNew, onFromTemplate, o
       <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari produk…" aria-label="Cari produk" style={{ marginBottom: 18 }} />
 
       {list.length === 0 ? (
-        <Empty title="Belum ada produk" sub={q ? 'Tidak ada yang cocok dengan pencarian.' : 'Mulai dengan bikin produk baru.'}
-          action={!q && <button className="btn btn-primary" onClick={onNew}>Produk baru</button>} />
+        <Empty title={q ? 'Produk tidak ditemukan' : 'Belum ada produk'} sub={q ? 'Tidak ada yang cocok dengan pencarian.' : undefined} />
       ) : (
         <div className="product-grid">
           {list.map((p) => {
