@@ -1,6 +1,5 @@
 // Akun (mode Supabase, khusus admin): ganti password, unduh Excel, pindahkan data dari browser.
 import React from 'react';
-import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
 import { friendlyError } from '../lib/supabase.js';
 import { mergeProducts, readBrowserData } from '../lib/sync.js';
@@ -18,7 +17,7 @@ const Section = ({ title, sub, children }) => (
 
 const Msg = ({ m }) => (m ? <div className={`auth-alert auth-alert-${m.tone || 'bad'}`} role="status">{m.text}</div> : null);
 
-const AccountPage = ({ client, session, membership, workspace, onLogout }) => {
+const AccountPage = ({ client, session, membership, workspace }) => {
   const { shop } = membership;
   const me = session.user;
 
@@ -89,10 +88,6 @@ const AccountPage = ({ client, session, membership, workspace, onLogout }) => {
             </button>
           </Section>
         )}
-
-        <div>
-          <button className="btn btn-ghost" onClick={onLogout}><Icon.Logout style={{ width: 14, height: 14 }} /> Keluar</button>
-        </div>
       </div>
     </div>
   );

@@ -62,15 +62,15 @@ function useAppearance() {
 }
 
 // ── Status simpan ─────────────────────────────────────────────────────────
+// Normalnya tidak tampil apa-apa (simpan otomatis). Hanya muncul kalau gagal menyimpan, supaya data tidak hilang diam-diam.
 
 const SavePill = ({ save, readOnly, onRetry }) => {
-  if (readOnly) return <span className="save-pill">Hanya lihat</span>;
-  if (save.state === 'error') {
-    return <button className="save-pill error" onClick={onRetry} title={friendlyError(save.error)}>Gagal menyimpan · coba lagi</button>;
-  }
-  const label = { saved: 'Tersimpan', pending: 'Belum tersimpan…', saving: 'Menyimpan…' }[save.state] || '';
-  return <span className="save-pill" aria-live="polite">{label}</span>;
+  if (readOnly || save.state !== 'error') return null;
+  return <button className="save-pill error" onClick={onRetry} title={friendlyError(save.error)}>Gagal menyimpan · coba lagi</button>;
 };
+
+// Tombol pengaturan tampilan (tema, font, kepadatan) disembunyikan. Ubah ke true untuk memunculkan lagi.
+const SHOW_APPEARANCE_BUTTON = false;
 
 const Center = ({ children }) => <div className="center-screen"><div>{children}</div></div>;
 
@@ -146,9 +146,11 @@ const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, sa
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           {savePill}
-          <button className="btn btn-ghost btn-sm btn-tampilan" onClick={appearance.toggle} title="Pengaturan tampilan" aria-label="Pengaturan tampilan">
-            <Icon.Gear style={{ width: 16, height: 16 }} />
-          </button>
+          {SHOW_APPEARANCE_BUTTON && (
+            <button className="btn btn-ghost btn-sm btn-tampilan" onClick={appearance.toggle} title="Pengaturan tampilan" aria-label="Pengaturan tampilan">
+              <Icon.Gear style={{ width: 16, height: 16 }} />
+            </button>
+          )}
           <div className="mono user-chip" style={{ fontSize: 12, color: 'var(--text-3)', padding: '5px 10px', background: 'var(--surface-2)', borderRadius: 20 }}>
             {userLabel}
           </div>
@@ -174,9 +176,6 @@ const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, sa
             })}
           </div>
         ))}
-        <div style={{ marginTop: 'auto', padding: '12px 10px', fontSize: 11, color: 'var(--text-4)', fontFamily: 'var(--mono)' }}>
-          v3 beta · Pricelab
-        </div>
       </div>
 
       <main className="main" ref={mainRef}>
@@ -256,7 +255,7 @@ const RemoteShell = ({ session, membership, appearance }) => {
     </div>
   );
   const account = isAdmin && (
-    <AccountPage client={supabase} session={session} membership={membership} workspace={workspace} onLogout={logout} />
+    <AccountPage client={supabase} session={session} membership={membership} workspace={workspace} />
   );
 
   return (
