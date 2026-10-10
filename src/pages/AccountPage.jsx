@@ -1,9 +1,10 @@
-// Akun (mode Supabase, khusus admin): ganti password, unduh data, pindahkan data dari browser.
+// Akun (mode Supabase, khusus admin): ganti password, unduh Excel, pindahkan data dari browser.
 import React from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { Field } from '../components/ui.jsx';
 import { friendlyError } from '../lib/supabase.js';
 import { mergeProducts, readBrowserData } from '../lib/sync.js';
+import { downloadExcel, excelFileName, masterSheets, productSheets } from '../lib/excelExport.js';
 
 const Section = ({ title, sub, children }) => (
   <section className="card">
@@ -17,15 +18,6 @@ const Section = ({ title, sub, children }) => (
 
 const Msg = ({ m }) => (m ? <div className={`auth-alert auth-alert-${m.tone || 'bad'}`} role="status">{m.text}</div> : null);
 
-function download(name, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
 const AccountPage = ({ client, session, membership, workspace, onLogout }) => {
   const { shop } = membership;
   const me = session.user;
@@ -33,11 +25,15 @@ const AccountPage = ({ client, session, membership, workspace, onLogout }) => {
   // ── data
   const browserData = React.useMemo(() => readBrowserData(), []);
   const [dataMsg, setDataMsg] = React.useState(null);
-  const exportData = () => {
-    const stamp = new Date().toISOString().slice(0, 10);
-    download(`pricelab-${shop.name.replace(/\W+/g, '-').toLowerCase()}-${stamp}.json`, {
-      exportedAt: new Date().toISOString(), shop: shop.name, master: workspace.master, products: workspace.products,
-    });
+  const [busy, setBusy] = React.useState('');
+  const exportExcel = async (what) => {
+    setBusy(what); setDataMsg(null);
+    try {
+      if (what === 'master') await downloadExcel(masterSheets(workspace.master), excelFileName('Data master', shop.name));
+      else await downloadExcel(productSheets(workspace.products, workspace.master), excelFileName('Daftar produk', shop.name));
+    } catch {
+      setDataMsg({ text: 'Gagal membuat file Excel. Coba lagi.' });
+    } finally { setBusy(''); }
   };
   const importBrowser = () => {
     if (!browserData) return;
@@ -74,18 +70,25 @@ const AccountPage = ({ client, session, membership, workspace, onLogout }) => {
           </div>
         </Section>
 
-        <Section title="Data">
+        <Section title="Unduh Excel" sub="Untuk dibaca atau dicetak. Mengubah isi file Excel tidak mengubah data di aplikasi.">
           <Msg m={dataMsg} />
           <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary" onClick={exportData}>Unduh semua data (JSON)</button>
-            {browserData && (
-              <button className="btn btn-secondary" onClick={importBrowser} disabled={workspace.readOnly}>
-                Pindahkan data dari browser ini ({browserData.products.length} produk)
-              </button>
-            )}
+            <button className="btn btn-secondary" onClick={() => exportExcel('master')} disabled={!!busy}>
+              {busy === 'master' ? 'Menyiapkan…' : 'Data master (Excel)'}
+            </button>
+            <button className="btn btn-secondary" onClick={() => exportExcel('products')} disabled={!!busy || !workspace.products.length}>
+              {busy === 'products' ? 'Menyiapkan…' : `Daftar produk (Excel) · ${workspace.products.length}`}
+            </button>
           </div>
-          {browserData && <div className="field-hint" style={{ marginTop: 8 }}>Ditemukan data dari versi sebelumnya yang tersimpan di browser ini.</div>}
         </Section>
+
+        {browserData && (
+          <Section title="Data dari versi sebelumnya" sub="Ditemukan data yang tersimpan di browser ini dari versi sebelum pakai akun.">
+            <button className="btn btn-secondary" onClick={importBrowser} disabled={workspace.readOnly}>
+              Pindahkan ke akun ({browserData.products.length} produk)
+            </button>
+          </Section>
+        )}
 
         <div>
           <button className="btn btn-ghost" onClick={onLogout}><Icon.Logout style={{ width: 14, height: 14 }} /> Keluar</button>
