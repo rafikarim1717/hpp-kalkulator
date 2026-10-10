@@ -4,11 +4,11 @@
 import React from 'react';
 import { Icon } from './components/Icon.jsx';
 import Login from './components/Login.jsx';
-import AuthScreen, { Onboarding } from './components/AuthScreen.jsx';
+import AuthScreen from './components/AuthScreen.jsx';
 import { TweakRadio, TweakSection, TweakSlider, TweaksPanel, useTweaks } from './components/TweaksPanel.jsx';
 import { useLocalState } from './hooks/useLocalState.js';
 import { useLocalWorkspace, useRemoteWorkspace } from './hooks/useWorkspace.js';
-import { captureInviteFromUrl, useMembership, useSession } from './hooks/useAccount.js';
+import { useMembership, useSession } from './hooks/useAccount.js';
 import { supabase, friendlyError } from './lib/supabase.js';
 import { newId } from './lib/masterData.js';
 import DigitalCalcPage, { newDigitalItem } from './pages/DigitalCalcPage.jsx';
@@ -30,14 +30,14 @@ const TWEAK_DEFAULTS = {
 const NAV = [
   { id: 'offset', label: 'Offset Printing', icon: Icon.Calc, group: 'Kalkulator' },
   { id: 'digital', label: 'Digital Printing', icon: Icon.Grid, group: 'Kalkulator' },
-  { id: 'paper', label: 'Kertas', icon: Icon.Paper, group: 'Data Master' },
-  { id: 'machine', label: 'Mesin', icon: Icon.Tool, group: 'Data Master' },
-  { id: 'finishing', label: 'Finishing', icon: Icon.Edit, group: 'Data Master' },
-  { id: 'other', label: 'Biaya lain', icon: Icon.Plus, group: 'Data Master' },
-  { id: 'digital-master', label: 'Digital', icon: Icon.Grid, group: 'Data Master' },
+  { id: 'paper', label: 'Kertas', icon: Icon.Paper, group: 'Data Master', adminOnly: true },
+  { id: 'machine', label: 'Mesin', icon: Icon.Tool, group: 'Data Master', adminOnly: true },
+  { id: 'finishing', label: 'Finishing', icon: Icon.Edit, group: 'Data Master', adminOnly: true },
+  { id: 'other', label: 'Biaya lain', icon: Icon.Plus, group: 'Data Master', adminOnly: true },
+  { id: 'digital-master', label: 'Digital', icon: Icon.Grid, group: 'Data Master', adminOnly: true },
   { id: 'settings', label: 'Pengaturan umum', icon: Icon.Clock, group: 'Pengaturan' },
 ];
-const ACCOUNT_NAV = { id: 'account', label: 'Akun & Tim', icon: Icon.Users, group: 'Pengaturan' };
+const ACCOUNT_NAV = { id: 'account', label: 'Akun', icon: Icon.Users, group: 'Pengaturan', adminOnly: true };
 
 // ── Tampilan (tema, kepadatan, font) ───────────────────────────────────────
 
@@ -76,7 +76,8 @@ const Center = ({ children }) => <div className="center-screen"><div>{children}<
 
 // ── Kerangka aplikasi (sama untuk mode lokal & Supabase) ───────────────────
 
-const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, savePill }) => {
+// isAdmin=false (pegawai): menu Data Master & Akun tidak muncul dan halamannya tidak bisa dibuka.
+const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, savePill, isAdmin = true }) => {
   const [page, setPage] = useLocalState('pl2_page', 'offset');
   const [openId, setOpenId] = useLocalState('pl2_open', null);
   const [mobileNav, setMobileNav] = React.useState(false);
@@ -89,7 +90,7 @@ const Shell = ({ workspace, appearance, userLabel, onLogout, account, banner, sa
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [page, openId]);
 
-  const nav = account ? [...NAV, ACCOUNT_NAV] : NAV;
+  const nav = (account ? [...NAV, ACCOUNT_NAV] : NAV).filter((n) => isAdmin || !n.adminOnly);
   const current = nav.some((n) => n.id === page) ? page : 'offset';
 
   const openProduct = products.find((p) => p.id === openId);
@@ -203,43 +204,36 @@ const signOut = () => supabase.auth.signOut();
 
 const RemoteApp = () => {
   const appearance = useAppearance();
-  const [initialInvite] = React.useState(() => captureInviteFromUrl());
-  const { session, recovery, endRecovery } = useSession(supabase);
-
-  let screen;
-  if (session === undefined) screen = <Center>Memuat…</Center>;
-  else if (!session || recovery) {
-    screen = <AuthScreen client={supabase} initialInvite={initialInvite} recovery={recovery} onRecoveryDone={endRecovery} />;
-  } else screen = <MemberGate key={session.user.id} session={session} appearance={appearance} initialInvite={initialInvite} />;
-
-  return <>{screen}{!session && appearance.panel}</>;
+  const session = useSession(supabase);
+  if (session === undefined) return <Center>Memuat…</Center>;
+  if (!session) return <AuthScreen client={supabase} />;
+  return <MemberGate key={session.user.id} session={session} appearance={appearance} />;
 };
 
-const MemberGate = ({ session, appearance, initialInvite }) => {
+const MemberGate = ({ session, appearance }) => {
   const membership = useMembership(supabase, session);
-  if (membership.status === 'loading') return <Center>Memuat percetakan…</Center>;
-  if (membership.status === 'error') {
-    return (
-      <Center>
-        <p>{friendlyError(membership.error)}</p>
-        <div className="row" style={{ gap: 8, justifyContent: 'center', marginTop: 12 }}>
-          <button className="btn btn-primary" onClick={membership.reload}>Coba lagi</button>
-          <button className="btn btn-ghost" onClick={signOut}>Keluar</button>
-        </div>
-      </Center>
-    );
+  if (membership.status === 'loading') return <Center>Memuat…</Center>;
+  if (membership.status === 'ready') {
+    return <RemoteShell key={membership.shop.id} session={session} membership={membership} appearance={appearance} />;
   }
-  if (membership.status === 'none') {
-    return <Onboarding client={supabase} error={membership.error} onDone={membership.reload} onLogout={signOut} initialInvite={initialInvite} />;
-  }
-  return <RemoteShell key={membership.shop.id} session={session} membership={membership} appearance={appearance} />;
+  return (
+    <Center>
+      <p>{membership.status === 'error'
+        ? friendlyError(membership.error)
+        : `Akun ${session.user.email} belum terhubung ke percetakan. Hubungi pengelola aplikasi.`}</p>
+      <div className="row" style={{ gap: 8, justifyContent: 'center', marginTop: 12 }}>
+        {membership.status === 'error' && <button className="btn btn-primary" onClick={membership.reload}>Coba lagi</button>}
+        <button className="btn btn-ghost" onClick={signOut}>Keluar</button>
+      </div>
+    </Center>
+  );
 };
 
 const RemoteShell = ({ session, membership, appearance }) => {
   const workspace = useRemoteWorkspace(supabase, membership.shop);
-  const { shop } = membership;
+  const { shop, isAdmin } = membership;
 
-  if (workspace.status === 'loading') return <Center>Memuat data {shop.name}…</Center>;
+  if (workspace.status === 'loading') return <Center>Memuat data…</Center>;
   if (workspace.status === 'error') {
     return (
       <Center>
@@ -258,18 +252,17 @@ const RemoteShell = ({ session, membership, appearance }) => {
   };
   const banner = !shop.active && (
     <div className="shop-banner" role="status">
-      Masa aktif <b>{shop.name}</b> sudah berakhir. Data masih bisa dilihat, tapi perubahan tidak disimpan. Hubungi admin Pricelab untuk memperpanjang.
+      Akses aplikasi sedang tidak aktif. Data masih bisa dilihat, tapi perubahan tidak disimpan. Hubungi pengelola aplikasi.
     </div>
   );
-  const account = (
-    <AccountPage client={supabase} session={session} membership={membership} workspace={workspace}
-      onShopChanged={membership.reload} onLogout={logout} />
+  const account = isAdmin && (
+    <AccountPage client={supabase} session={session} membership={membership} workspace={workspace} onLogout={logout} />
   );
 
   return (
-    <Shell workspace={workspace} appearance={appearance}
+    <Shell workspace={workspace} appearance={appearance} isAdmin={isAdmin}
       userLabel={membership.displayName || session.user.email}
-      onLogout={logout} account={account} banner={banner}
+      onLogout={logout} account={account || null} banner={banner}
       savePill={<SavePill save={workspace.save} readOnly={workspace.readOnly} onRetry={workspace.retry} />} />
   );
 };
