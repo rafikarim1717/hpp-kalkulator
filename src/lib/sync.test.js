@@ -87,3 +87,9 @@ describe('mergeProducts', () => {
     expect(mergeProducts([{ id: 'a', v: 1 }], [{ id: 'a', v: 2 }, { id: 'b' }])).toEqual([{ id: 'a', v: 1 }, { id: 'b' }]);
   });
 });
+
+it('susunan otomatis selalu termurah walau tersimpan mode Android', () => {
+  const r = normalizeShopData({ settings: { autoLayout: 'reference', profitPct: 40 } });
+  expect(r.master.settings.autoLayout).toBe('cheapest');
+  expect(r.master.settings.profitPct).toBe(40);
+});

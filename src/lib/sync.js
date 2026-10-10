@@ -37,7 +37,8 @@ export function normalizeShopData(row) {
   return {
     seeded: true,
     master: {
-      settings: { ...DEFAULT_SETTINGS, ...row.settings },
+      // susunan otomatis selalu 'termurah' (mode app Android hanya untuk tes pencocokan angka)
+      settings: { ...DEFAULT_SETTINGS, ...row.settings, autoLayout: 'cheapest' },
       papers: Array.isArray(row.papers) ? row.papers : [],
       machines: Array.isArray(row.machines) ? row.machines : [],
       // jenis finishing baru di versi aplikasi berikutnya tetap muncul dengan nilai default

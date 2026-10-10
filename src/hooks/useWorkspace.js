@@ -17,7 +17,7 @@ const resolve = (next, prev) => (typeof next === 'function' ? next(prev) : next)
 // ── Mode lokal ────────────────────────────────────────────────────────────
 
 export function useLocalWorkspace() {
-  const [settings, setSettings] = useLocalState('pl2_settings', DEFAULT_MASTER.settings);
+  const [settings, setSettings] = useLocalState('pl2_settings', DEFAULT_MASTER.settings, (v) => ({ ...v, autoLayout: 'cheapest' }));
   const [papers, setPapers] = useLocalState('pl2_papers', DEFAULT_MASTER.papers);
   const [machines, setMachines] = useLocalState('pl2_machines', DEFAULT_MASTER.machines);
   const [finishing, setFinishing] = useLocalState('pl2_finishing', DEFAULT_MASTER.finishing, (f) => ({ ...DEFAULT_FINISHING, ...f }));

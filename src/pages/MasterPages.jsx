@@ -383,36 +383,38 @@ export const SettingsPage = ({ settings, setSettings }) => {
   const set = (patch) => setSettings({ ...settings, ...patch });
   return (
     <div className="page-fade">
-      <Header title="Pengaturan" em="umum" sub="Profit, pajak, dan bleed. Berlaku untuk semua kalkulasi offset dan digital. Satuan cm, mata uang Rupiah." />
+      <Header title="Pengaturan" em="umum" sub="Berlaku untuk semua kalkulasi offset dan digital." />
       <div className="stack" style={{ maxWidth: 760 }}>
         <div className="card">
-          <div className="grid-4">
+          <div className="section-eyebrow" style={{ marginBottom: 4 }}>Profit & pajak</div>
+          <div className="field-hint" style={{ marginBottom: 14 }}>Harga jual = modal + profit + pajak. Kalau profit dari persen lebih kecil dari profit minimum, yang dipakai profit minimum.</div>
+          <div className="grid-3">
             <NumField label="Profit" suffix="%" value={settings.profitPct} onChange={(v) => set({ profitPct: v })} />
-            <NumField label="Profit minimum" suffix="Rp" value={settings.profitMin} onChange={(v) => set({ profitMin: v })} />
+            <NumField label="Profit minimum per order" suffix="Rp" value={settings.profitMin} onChange={(v) => set({ profitMin: v })} />
             <NumField label="Pajak" suffix="%" value={settings.taxPct} onChange={(v) => set({ taxPct: v })} />
-            <NumField label="Bleed" suffix="cm" value={settings.bleed} onChange={(v) => set({ bleed: v })} hint="di tiap sisi" />
           </div>
-        </div>
-        <div className="card">
-          <div className="section-eyebrow" style={{ marginBottom: 12 }}>Susunan otomatis (offset)</div>
-          <Select label="Kalau susunan tidak dipilih manual" value={settings.autoLayout || 'cheapest'} onChange={(v) => set({ autoLayout: v })}
-            options={[
-              { value: 'cheapest', label: 'Termurah yang muat semua mesin finishing (disarankan)' },
-              { value: 'reference', label: 'Sama dengan app Android: naik maksimal, kalau kebesaran langsung 1 naik' },
-            ]} />
         </div>
         <div className="grid-2">
           <div className="card">
-            <div className="section-eyebrow" style={{ marginBottom: 12 }}>Profit dihitung dari</div>
+            <div className="section-eyebrow" style={{ marginBottom: 4 }}>Komponen yang kena profit</div>
+            <div className="field-hint" style={{ marginBottom: 12 }}>Yang tidak dicentang masuk ke harga apa adanya, tanpa ditambah profit.</div>
             <div className="stack" style={{ gap: 8 }}>
               {GROUPS.map((g) => <Check key={g.key} label={g.label} checked={settings.profitOn?.[g.key] !== false} onChange={(v) => set({ profitOn: { ...settings.profitOn, [g.key]: v } })} />)}
             </div>
           </div>
           <div className="card">
-            <div className="section-eyebrow" style={{ marginBottom: 12 }}>Pajak dihitung dari</div>
+            <div className="section-eyebrow" style={{ marginBottom: 4 }}>Komponen yang kena pajak</div>
+            <div className="field-hint" style={{ marginBottom: 12 }}>Yang tidak dicentang tidak dikenai pajak.</div>
             <div className="stack" style={{ gap: 8 }}>
               {GROUPS.map((g) => <Check key={g.key} label={g.label} checked={settings.taxOn?.[g.key] !== false} onChange={(v) => set({ taxOn: { ...settings.taxOn, [g.key]: v } })} />)}
             </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="section-eyebrow" style={{ marginBottom: 4 }}>Bleed</div>
+          <div className="field-hint" style={{ marginBottom: 14 }}>Lebihan gambar di tiap sisi supaya tidak ada garis putih setelah dipotong. Dipakai kalau di produk dicentang "pakai bleed".</div>
+          <div style={{ maxWidth: 240 }}>
+            <NumField label="Bleed per sisi" suffix="cm" value={settings.bleed} onChange={(v) => set({ bleed: v })} />
           </div>
         </div>
       </div>
